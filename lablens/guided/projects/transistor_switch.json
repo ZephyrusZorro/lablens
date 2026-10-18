@@ -1,0 +1,30 @@
+{
+  "id": "transistor_switch",
+  "title": "Starter: BC547 transistor switch driving an LED",
+  "manual_page": "Guided project: transistor switch",
+  "finish": "Parts placed. Emitter to ground, LED and 330 ohm from +5 V to the collector, 1 kilo-ohm from your control wire to the base. Touch the control wire to +5 V and the LED lights.",
+  "steps": [
+    {
+      "instruction": "Place the breadboard flat in front of the camera.",
+      "expect": [{"label": "breadboard", "min": 1, "max": 1}]
+    },
+    {
+      "instruction": "Place the BC547 transistor on the left half, flat face toward you.",
+      "expect": [{"label": "transistor", "min": 1, "max": 1, "zone": [0.0, 0.0, 0.55, 1.0],
+                  "zone_hint": "Move the transistor to the left half of the board."}],
+      "tip": "BC547 with the flat face toward you and legs down: collector, base, emitter from left to right."
+    },
+    {
+      "instruction": "Place the 1 kilo-ohm base resistor (brown, black, red) right next to the transistor.",
+      "expect": [{"label": "resistor", "min": 1}],
+      "near": [["resistor", "transistor", 0.4]],
+      "value": {"label": "resistor", "ohms": 1000, "tolerance": 0.25},
+      "tip": "It goes between your control signal and the middle leg (base)."
+    },
+    {
+      "instruction": "Place the LED (with its 330 ohm resistor) on the right side as the load.",
+      "expect": [{"label": "led", "min": 1, "zone": [0.45, 0.0, 1.0, 1.0]}, {"label": "resistor", "min": 2}],
+      "tip": "LED long leg toward +5 V; the resistor and LED together go from +5 V to the collector."
+    }
+  ]
+}

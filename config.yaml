@@ -1,0 +1,78 @@
+# LabLens configuration. Secrets (GROQ_API_KEY) go in .env, not here.
+
+vision:
+  # Ensemble of open-source YOLOv8 component detectors (ONNX, run without PyTorch).
+  # scripts/setup_models.py downloads + converts them. Add your own fine-tuned best.pt the same way:
+  # it is converted to ONNX automatically on first load.
+  models:
+    - path: models/components_v8n_6cls.onnx   # capacitor, diode, LED, resistor, transistor, zener
+      imgsz: 800
+      weight: 1.0
+      conf: 0.20
+    - path: models/components_v8s_4cls.onnx   # capacitor, IC, LED, resistor
+      imgsz: 640
+      weight: 1.0
+      conf: 0.20
+  ensemble:
+    conf: 0.35               # output threshold after weighted box fusion
+    iou_fuse: 0.5
+    max_area_frac: 0.25      # reject boxes covering >25% of the frame (top-down bench parts are small)
+    single_model_penalty: 0.7
+    slice_grid: 0            # 2 = 2x2 tiled inference + full frame (better for small parts, ~5x slower)
+  breadboard_cv: true        # classical breadboard detector (no model needed)
+  camera_index: 0
+  camera_width: 1280
+  camera_height: 720
+  mock: false                # true = fixed fake detections, no models needed
+
+pointing:
+  ray_length_factor: 2.5   # ray from landmark 6 -> 8, extended by this multiple of the 6->8 segment
+  smoothing_frames: 10
+  dwell_seconds: 0.5
+  min_agreement: 0.6       # share of smoothing window that must agree before locking
+  nearest_max_px: 120      # if the ray hits nothing, accept nearest box within this distance
+
+gestures:
+  hold_frames: 6           # gesture must be stable this many frames
+  cooldown_seconds: 1.5
+
+audio:
+  stt_backend: auto        # auto | groq | faster_whisper
+  whisper_local_model: base.en
+  tts_backend: auto        # auto | pyttsx3 | gtts | piper | none
+  piper_model: models/piper/en_US-lessac-medium.onnx
+  language: en             # en | hi | kn  (stage 4: Hindi / Kannada answers)
+  record_seconds: 6
+
+rag:
+  pdf_dir: data/datasheets
+  index_dir: data/index
+  chunk_chars: 900
+  chunk_overlap: 150
+  embed_model: sentence-transformers/all-MiniLM-L6-v2
+  top_k: 4
+  label_boost: 0.15        # boost chunks whose source matches the pointed component
+
+llm:
+  prefer: groq             # groq | ollama
+  groq_model: llama-3.3-70b-versatile
+  ollama_model: llama3.2:3b
+  ollama_host: http://localhost:11434
+  online_check_seconds: 10
+  request_timeout: 20
+  temperature: 0.2
+
+cache:
+  enabled: true
+  path: data/answer_cache.sqlite
+
+scraper:
+  enabled: true
+  download_dir: data/datasheets/scraped
+  max_mb: 15
+
+dashboard:
+  db_path: data/lablens_events.sqlite
+
+guided:
+  projects_dir: lablens/guided/projects

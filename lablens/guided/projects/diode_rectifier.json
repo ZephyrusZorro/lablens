@@ -1,0 +1,30 @@
+{
+  "id": "diode_rectifier",
+  "title": "Starter: diode direction test with an LED",
+  "manual_page": "Guided project: diode with LED indicator",
+  "finish": "Parts placed. +5 V to the diode anode, banded end to the resistor, resistor to the LED long leg, LED short leg to ground. Then flip the diode and see the LED go out.",
+  "steps": [
+    {
+      "instruction": "Place the breadboard flat in front of the camera.",
+      "expect": [{"label": "breadboard", "min": 1, "max": 1}]
+    },
+    {
+      "instruction": "Place the 1N4007 diode on the left side. The band marks the cathode.",
+      "expect": [{"label": "diode", "min": 1, "max": 1, "zone": [0.0, 0.0, 0.5, 1.0],
+                  "zone_hint": "Move the diode to the left half of the board."}],
+      "tip": "Silver or white band equals cathode."
+    },
+    {
+      "instruction": "Place the 330 ohm resistor (orange, orange, brown) after the diode's banded end.",
+      "expect": [{"label": "resistor", "min": 1, "max": 1}],
+      "near": [["resistor", "diode", 0.5]],
+      "value": {"label": "resistor", "ohms": 330, "tolerance": 0.25}
+    },
+    {
+      "instruction": "Place the LED on the right side as the indicator.",
+      "expect": [{"label": "led", "min": 1, "max": 1, "zone": [0.5, 0.0, 1.0, 1.0],
+                  "zone_hint": "Move the LED to the right half of the board."}],
+      "near": [["led", "resistor", 0.6]]
+    }
+  ]
+}

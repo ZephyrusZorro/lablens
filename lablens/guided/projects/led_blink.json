@@ -1,0 +1,45 @@
+{
+  "id": "led_blink",
+  "title": "NE555 LED blinker (about 1 Hz)",
+  "manual_page": "Guided project: NE555 LED blinker",
+  "finish": "All parts are placed. Check the wiring against manual page 11, then connect 5 to 9 volts. The LED should blink about once per second.",
+  "steps": [
+    {
+      "instruction": "Place the breadboard flat in front of the camera so the whole board is visible.",
+      "expect": [{"label": "breadboard", "min": 1, "max": 1}],
+      "tip": "Top-down view, desk lamp on, avoid glare from the overhead light."
+    },
+    {
+      "instruction": "Place the NE555 timer across the centre channel of the breadboard, notch to the left.",
+      "expect": [
+        {"label": "ic", "min": 1, "max": 1, "zone": [0.2, 0.25, 0.8, 0.75],
+         "zone_hint": "Put the IC in the middle of the board, straddling the centre channel."}
+      ],
+      "tip": "Each pin needs its own column. Pin 1 is next to the notch."
+    },
+    {
+      "instruction": "Add R1 (1 kilo-ohm: brown, black, red) and R2 (68 kilo-ohm: blue, grey, orange) next to the IC.",
+      "expect": [{"label": "resistor", "min": 2}],
+      "near": [["resistor", "ic", 0.45]],
+      "tip": "R1 goes from pin 8 to pin 7. R2 goes from pin 7 to pin 6. Join pins 6 and 2."
+    },
+    {
+      "instruction": "Add the 10 microfarad electrolytic capacitor from pin 2 to ground, stripe to ground.",
+      "expect": [{"label": "capacitor", "min": 1}],
+      "near": [["capacitor", "ic", 0.5]],
+      "tip": "The stripe with minus signs marks the negative lead. It must go to ground."
+    },
+    {
+      "instruction": "Add the LED and its 330 ohm resistor (orange, orange, brown) from pin 3 to ground.",
+      "expect": [{"label": "led", "min": 1}, {"label": "resistor", "min": 3}],
+      "tip": "Long leg (anode) toward pin 3 through the resistor, short leg to ground."
+    },
+    {
+      "instruction": "Final check: IC, three resistors, capacitor and LED are all on the board.",
+      "expect": [
+        {"label": "ic", "min": 1}, {"label": "resistor", "min": 3},
+        {"label": "capacitor", "min": 1}, {"label": "led", "min": 1}
+      ]
+    }
+  ]
+}

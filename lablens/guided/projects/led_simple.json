@@ -1,0 +1,26 @@
+{
+  "id": "led_simple",
+  "title": "Starter: LED with current-limiting resistor",
+  "manual_page": "Guided project: LED with current-limiting resistor",
+  "finish": "Both parts are placed. Wire +5 V to the resistor, resistor to the LED long leg, LED short leg to ground, then power on.",
+  "steps": [
+    {
+      "instruction": "Place the breadboard flat in front of the camera.",
+      "expect": [{"label": "breadboard", "min": 1, "max": 1}]
+    },
+    {
+      "instruction": "Place one 330 ohm resistor (orange, orange, brown) on the left half of the board.",
+      "expect": [{"label": "resistor", "min": 1, "max": 1, "zone": [0.0, 0.0, 0.55, 1.0],
+                  "zone_hint": "Move the resistor to the left half of the board."}],
+      "value": {"label": "resistor", "ohms": 330, "tolerance": 0.25},
+      "tip": "Orange, orange, brown, gold is 330 ohm."
+    },
+    {
+      "instruction": "Place the LED on the right half, close to the resistor. Long leg toward the resistor.",
+      "expect": [{"label": "led", "min": 1, "max": 1, "zone": [0.45, 0.0, 1.0, 1.0],
+                  "zone_hint": "Move the LED to the right half of the board."}],
+      "near": [["resistor", "led", 0.6]],
+      "tip": "The long leg is the anode (+). The flat edge of the rim marks the cathode."
+    }
+  ]
+}

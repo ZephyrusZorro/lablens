@@ -1,0 +1,3 @@
+# Only needed to fine-tune your own detector (scripts/train_yolo.py). Pulls PyTorch (~2 GB).
+-r requirements.txt
+ultralytics>=8.2
