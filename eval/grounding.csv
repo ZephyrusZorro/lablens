@@ -1,0 +1,41 @@
+question,pointed,expected_pages,source
+which pin is ground,ic,7|8,LabLens_Lab_Manual.pdf
+which pin is ground on the NE555,,7,LabLens_Lab_Manual.pdf
+what does pin 4 do on the 555,,7,LabLens_Lab_Manual.pdf
+how do I make the 555 blink once a second,,7|11,LabLens_Lab_Manual.pdf
+what is the output pin of the LM358,,8,LabLens_Lab_Manual.pdf
+what supply voltage does the LM358 need,,8,LabLens_Lab_Manual.pdf
+which leg is positive,led,3,LabLens_Lab_Manual.pdf
+which leg is positive,capacitor,4,LabLens_Lab_Manual.pdf
+which side is the cathode,diode,5,LabLens_Lab_Manual.pdf
+which side is the cathode,led,3,LabLens_Lab_Manual.pdf
+what resistor do I need for this,led,3,LabLens_Lab_Manual.pdf
+how much current can this take,led,3,LabLens_Lab_Manual.pdf
+how do I read the value,resistor,2,LabLens_Lab_Manual.pdf
+what colours is a 220 ohm resistor,,2,LabLens_Lab_Manual.pdf
+what are the bands for 10 kilo ohm,,2,LabLens_Lab_Manual.pdf
+does it matter which way round it goes,resistor,2,LabLens_Lab_Manual.pdf
+does it matter which way round it goes,capacitor,4,LabLens_Lab_Manual.pdf
+what does 104 mean on a ceramic capacitor,,4,LabLens_Lab_Manual.pdf
+what voltage rating should I pick,capacitor,4,LabLens_Lab_Manual.pdf
+what are the pins,transistor,6|13,LabLens_Lab_Manual.pdf
+which leg is the base on a BC547,,6|13,LabLens_Lab_Manual.pdf
+what is the pinout of the 2N2222,,6,LabLens_Lab_Manual.pdf
+what base resistor should I use,transistor,6|13,LabLens_Lab_Manual.pdf
+what is the maximum current of the 1N4007,,5,LabLens_Lab_Manual.pdf
+how do I connect a flyback diode,,5,LabLens_Lab_Manual.pdf
+how do I use a zener diode,,5,LabLens_Lab_Manual.pdf
+which holes are connected together,breadboard,1,LabLens_Lab_Manual.pdf
+why is my IC shorted on the breadboard,,1,LabLens_Lab_Manual.pdf
+how do the power rails work,breadboard,1,LabLens_Lab_Manual.pdf
+which pins can do PWM,arduino,9,LabLens_Lab_Manual.pdf
+how much current can an Arduino pin give,,9,LabLens_Lab_Manual.pdf
+where is the built in LED on the Arduino,,9,LabLens_Lab_Manual.pdf
+what is VIN on the Nano,,9,LabLens_Lab_Manual.pdf
+my LED does not light what should I check,,3|10,LabLens_Lab_Manual.pdf
+something is getting hot what do I do,,10,LabLens_Lab_Manual.pdf
+how do I debug my circuit,,10,LabLens_Lab_Manual.pdf
+what parts do I need for the 555 blinker,,11,LabLens_Lab_Manual.pdf
+how do I wire the LED with a resistor,,12|3,LabLens_Lab_Manual.pdf
+how do I build the transistor switch,,13,LabLens_Lab_Manual.pdf
+what happens if I reverse the diode in the LED circuit,,14,LabLens_Lab_Manual.pdf

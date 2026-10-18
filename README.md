@@ -10,6 +10,10 @@ It keeps working when the lab Wi-Fi dies: answers switch from Groq to a local Ol
 automatically, and if no LLM is available at all, LabLens quotes the relevant manual sentences with
 page citations instead of failing.
 
+> **Start here:** [docs/RUN_GUIDE.md](docs/RUN_GUIDE.md) covers install, controls, the 2-minute demo
+> script and troubleshooting. [docs/MANUAL_STEPS.md](docs/MANUAL_STEPS.md) lists the things that need
+> you: API key, GitHub push, camera mount, training on your own kit.
+
 ## Run it (Windows)
 
 1. Double-click **`setup_windows.bat`** (one time, needs internet: about 10 minutes).
@@ -22,8 +26,10 @@ page citations instead of failing.
 |---|---|
 | `run_lablens.bat` | Desktop window: lowest latency, best for the live demo |
 | `run_lablens.bat web` | Browser UI (Streamlit) with the cited datasheet page beside each answer |
-| `run_lablens.bat demo` | No camera needed: runs the full pipeline on a sample bench photo |
-| `python -m lablens.doctor` | Pre-demo check of camera, mic, models, LLM, speech |
+| `run_lablens.bat photo` | Live window on the sample photo; point with the mouse (camera-free backup demo) |
+| `run_lablens.bat demo` | One-shot run of the full pipeline on the sample photo |
+| `run_lablens.bat doctor` | Pre-demo check of camera, mic, models, LLM, speech |
+| `run_lablens.bat eval` | Grounding numbers (below) |
 
 Linux / macOS: `./setup.sh`, then `source .venv/bin/activate && python -m lablens.live`.
 
@@ -107,11 +113,22 @@ parts in your kit. For the best live results:
 
 ## Evaluation
 
+Measured on `eval/grounding.csv` (40 hand-labelled questions, 16 asked while pointing), no LLM involved:
+
+| Metric | Result |
+|---|---|
+| Correct manual page cited first | **88%** (top 4: 100%, MRR 0.93) |
+| Same questions with the pointed part ignored | 75% (top 4: 88%) |
+| "Which leg is positive?"-style questions: correct page first | **81% with pointing vs 50% without** |
+
+The questions were written alongside the manual, so treat these as internal benchmark numbers.
+Detector mAP and pointing accuracy on *your* bench still need measuring (docs/MANUAL_STEPS.md §7–8).
+
 ```bash
-python scripts/evaluate.py yolo --weights runs/lablens/weights/best.pt --data data.yaml  # mAP@0.5 (needs ultralytics)
-python scripts/evaluate.py pointing data/eval/pointing.csv     # correct selections out of N trials
+python scripts/evaluate.py yolo --weights models/my_kit.pt --data data.yaml          # mAP@0.5 (needs ultralytics)
+python scripts/evaluate.py pointing eval/pointing.csv          # correct selections out of N trials
 python scripts/evaluate.py latency -n 20                       # time to first token, Groq vs Ollama
-python scripts/evaluate.py grounding data/eval/grounding.csv  # cited-page accuracy, RAG vs plain LLM
+python scripts/evaluate.py grounding -v                       # cited-page accuracy, with vs without pointing
 ```
 
 ## Tests
@@ -121,7 +138,8 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-56 tests cover pointing geometry, gestures, query fusion and follow-ups, retrieval and the
+58 tests cover pointing geometry, gestures, query fusion and follow-ups, retrieval (incl. a grounding
+regression on eval/grounding.csv) and the
 extractive fallback, TTS sentence streaming, Guided Build verification, the ONNX writer and exporter,
 NMS / letterbox / anchors, Weighted Box Fusion, the breadboard detector, and the resistor reader
 (6 values × 4 angles). Model tests are skipped until `setup_models.py` has run. CI runs on
@@ -158,5 +176,7 @@ lablens/
   guided/                  step verification engine + projects/*.json
   dashboard/               event log + stuck-step report
 scripts/                   setup_models, build_manual, demo, train_yolo, evaluate
-tests/                     unit + model tests
+eval/                      labelled grounding questions + pointing-trial template
+docs/                      RUN_GUIDE.md (operate + demo), MANUAL_STEPS.md (what needs you)
+tests/                     unit, model and grounding-regression tests
 ```

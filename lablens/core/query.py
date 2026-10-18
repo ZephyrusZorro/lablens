@@ -44,9 +44,19 @@ def normalise_spoken_numbers(text: str) -> str:
     return re.sub(r"\b(ne|lm|cd)\s+(\d{3})", lambda m: m.group(1).upper() + m.group(2), text, flags=re.I)
 
 
+# Bare numbers students actually say. Only unambiguous ones: "358" or "741" could just as well be a
+# resistor value, so they need their LM / UA prefix.
+BARE_ALIASES = {"555": "NE555"}
+_BARE_RE = re.compile(r"(?<![\w.])(" + "|".join(BARE_ALIASES) + r")(?![\w.])")
+
+
 def extract_part_number(text: str) -> Optional[str]:
-    m = PART_RE.search(normalise_spoken_numbers(text))
-    return m.group(1).replace(" ", "").upper() if m else None
+    text = normalise_spoken_numbers(text)
+    m = PART_RE.search(text)
+    if m:
+        return m.group(1).replace(" ", "").upper()
+    m = _BARE_RE.search(text)
+    return BARE_ALIASES[m.group(1)] if m else None
 
 
 def detect_intents(question: str) -> List[str]:
@@ -115,9 +125,15 @@ def compose(question: str, ctx: QueryContext, convo: Optional[Conversation] = No
     last = convo.last if convo else None
 
     # Follow-up / pronoun resolution: inherit component + part number from the last turn
-    if last and (_is_followup(question) or (PRONOUNS.search(question) and not label)):
+    # ...unless the student is now pointing at a different kind of part: then it's a new topic.
+    if last and (_is_followup(question) or (PRONOUNS.search(question) and not label)) \
+            and (label is None or label == last.component):
         label = label or last.component
         part = part or last.part_number
+    # Still pointing at the same kind of part: keep the part number the student named earlier
+    # ("this 555 ..." then "which pin is the output?"). Naming a new number overrides it.
+    if last and label and not part and last.component == label:
+        part = last.part_number
 
     intents = detect_intents(question)
     expansions = {"pinout": "pinout pin configuration connection diagram",

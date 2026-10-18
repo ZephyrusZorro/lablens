@@ -113,6 +113,18 @@ def test_followup_inherits_component():
     assert cq.component_label == "ic"
 
 
+def test_bare_555_and_part_number_carries_over():
+    assert extract_part_number("what is this 555") == "NE555"
+    assert extract_part_number("is 741 ohm ok") is None  # bare numbers other than 555 stay ambiguous
+    conv = Conversation()
+    ic = Detection("ic", 0.9, 0, 0, 1, 1)
+    first = compose("what is this 555", QueryContext(component=ic), conv)
+    conv.add(Turn("what is this 555", "a timer", first.component_label, first.part_number))
+    assert compose("which pin is the output", QueryContext(component=ic), conv).part_number == "NE555"
+    led = Detection("led", 0.9, 0, 0, 1, 1)
+    assert compose("which leg is positive", QueryContext(component=led), conv).part_number is None
+
+
 def test_cache_key_normalises():
     cq = compose("which pin is ground", QueryContext())
     assert cache_key(cq, "Which pin is GND?") == cache_key(cq, "which pin is ground")

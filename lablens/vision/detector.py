@@ -172,10 +172,14 @@ class AsyncDetector:
             self.fps = 0.8 * self.fps + 0.2 * (1.0 / max(dt, 1e-3))
             self.updated_at = time.monotonic()
 
-    def close(self) -> None:
+    def close(self, timeout: float = 3.0) -> None:
+        """Stop the worker and wait for an in-flight inference to finish, so the ONNX sessions are
+        never torn down mid-run at interpreter exit."""
         with self._cv:
             self._stop = True
             self._cv.notify()
+        if self._t.is_alive() and threading.current_thread() is not self._t:
+            self._t.join(timeout)
 
 
 def _resolve_model(path: Path) -> Optional[Path]:

@@ -1,14 +1,14 @@
 """Reproduce the four numbers that go on the resume / slide deck.
 
-  python scripts/evaluate.py --yolo-test data/eval/images --yolo-labels data/eval/labels
-  python scripts/evaluate.py --pointing data/eval/pointing.csv
-  python scripts/evaluate.py --latency 20
-  python scripts/evaluate.py --grounding data/eval/grounding.csv
+  python scripts/evaluate.py grounding               # eval/grounding.csv, no LLM needed
+  python scripts/evaluate.py latency -n 20           # time to first token, Groq vs Ollama
+  python scripts/evaluate.py pointing eval/pointing.csv
+  python scripts/evaluate.py yolo --weights models/my_kit.pt --data path/to/data.yaml   # needs ultralytics
 
 Each sub-command prints a number you can cite. Keep the raw CSVs in the repo for reproducibility.
 
-pointing.csv : columns image,target_label   (you hand-label which box the finger is on, 50 trials)
-grounding.csv: columns question,expected_page,source   (hand-labelled correct citation)
+eval/grounding.csv : question,pointed,expected_pages,source   (hand-labelled; pages may be "7|11")
+eval/pointing.csv  : image,target_label   (photos of your hand pointing at a part, one row per trial)
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def pointing(args) -> None:
     det, hands = build_detector(cfg), HandTracker(max_hands=1)
     ok = total = 0
     with open(args.csv, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
+        for row in csv.DictReader(ln for ln in f if not ln.startswith("#")):
             frame = cv2.imread(row["image"])
             if frame is None:
                 continue
@@ -76,23 +76,62 @@ def latency(args) -> None:
                   f"(p90 {sorted(ttft)[int(0.9 * (len(ttft) - 1))]:.2f}s, n={len(ttft)})")
 
 
-def grounding(args) -> None:
-    from lablens.config import get_config
-    from lablens.core.assistant import LabLens
+def _retrieval_ranks(rows, store, k, label_boost, use_pointing=True):
+    from lablens.core.query import QueryContext, compose
+    from lablens.types import Detection
 
-    lens = LabLens.from_config(get_config())
-    rows = list(csv.DictReader(open(args.csv, newline="", encoding="utf-8")))
-    rag_ok = plain_ok = 0
+    ranks = []
     for r in rows:
-        a = lens.ask(r["question"])
-        rag_ok += int(any(c.page == int(r["expected_page"]) and c.source == r["source"] for c in a.citations))
-        lens.convo.clear()
-        # Baseline: plain LLM, no retrieval - it cannot cite a page, so it only passes if it names the right
-        # source file in its text. This keeps the comparison honest.
-        plain = lens.ask_without_rag(r["question"])
-        plain_ok += int(r["source"].split(".")[0].lower() in plain.lower())
-    n = max(len(rows), 1)
-    print(f"RAG grounding (correct cited page): {100 * rag_ok / n:.0f}%  |  plain LLM: {100 * plain_ok / n:.0f}%  (n={len(rows)})")
+        pointed = Detection(r["pointed"], 0.9, 0, 0, 1, 1) if use_pointing and r.get("pointed") else None
+        cq = compose(r["question"], QueryContext(component=pointed))
+        hits = store.search(cq.retrieval, k, cq.component_label, label_boost, cq.part_number)
+        ok_pages = {int(x) for x in r["expected_pages"].split("|")}
+        rank = next((i + 1 for i, c in enumerate(hits) if c.page in ok_pages and c.source == r["source"]), None)
+        ranks.append(rank)
+    return ranks
+
+
+def _summary(ranks, k):
+    n = max(len(ranks), 1)
+    top1 = sum(1 for x in ranks if x == 1) / n
+    topk = sum(1 for x in ranks if x is not None) / n
+    mrr = sum(1.0 / x for x in ranks if x) / n
+    return top1, topk, mrr
+
+
+def grounding(args) -> None:
+    """Retrieval grounding: is the page that answers the question the one LabLens cites?
+
+    Runs with no LLM (retrieval is what decides the citation). Also runs an ablation with the pointed
+    component removed, which measures what pointing adds. (A plain LLM without retrieval has no source to
+    cite at all, so its citation accuracy is 0% by construction; that is the baseline.)
+    """
+    from lablens.config import get_config
+    from lablens.rag.store import build_store
+
+    cfg = get_config()
+    store = build_store(cfg)
+    if not store.chunks:
+        raise SystemExit("knowledge base is empty - run scripts/build_manual.py first")
+    rows = list(csv.DictReader(open(args.csv, newline="", encoding="utf-8")))
+    k = cfg.get("rag.top_k", 4)
+    boost = cfg.get("rag.label_boost", 0.15)
+    with_p = _retrieval_ranks(rows, store, k, boost, True)
+    without = _retrieval_ranks(rows, store, k, boost, False)
+    a1, ak, am = _summary(with_p, k)
+    b1, bk, bm = _summary(without, k)
+    pointed_rows = [i for i, r in enumerate(rows) if r.get("pointed")]
+    c1 = _summary([with_p[i] for i in pointed_rows], k)[0] if pointed_rows else 0
+    d1 = _summary([without[i] for i in pointed_rows], k)[0] if pointed_rows else 0
+    print(f"Grounding on {len(rows)} hand-labelled questions ({len(pointed_rows)} asked while pointing):")
+    print(f"  cited page correct @1 : {100 * a1:.0f}%   @{k}: {100 * ak:.0f}%   MRR {am:.2f}")
+    print(f"  same, ignoring the pointed part: @1 {100 * b1:.0f}%   @{k}: {100 * bk:.0f}%   MRR {bm:.2f}")
+    print(f"  pointing questions only: @1 {100 * c1:.0f}% with pointing vs {100 * d1:.0f}% without")
+    misses = [(r["question"], r.get("pointed") or "-", r["expected_pages"], x) for r, x in zip(rows, with_p) if x != 1]
+    if misses and args.verbose:
+        print("  not first:")
+        for q, pt, exp, x in misses:
+            print(f"    [{pt}] {q!r} expected p.{exp}, rank {x}")
 
 
 def main() -> None:
@@ -109,7 +148,8 @@ def main() -> None:
     la.add_argument("-n", type=int, default=10)
     la.set_defaults(fn=latency)
     g = sub.add_parser("grounding")
-    g.add_argument("csv")
+    g.add_argument("csv", nargs="?", default=str(Path(__file__).resolve().parent.parent / "eval" / "grounding.csv"))
+    g.add_argument("-v", "--verbose", action="store_true")
     g.set_defaults(fn=grounding)
     args = p.parse_args()
     args.fn(args)

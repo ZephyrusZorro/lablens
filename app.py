@@ -21,6 +21,25 @@ st.set_page_config(page_title="LabLens", page_icon="🔬", layout="wide")
 cfg = get_config()
 
 
+def wide(fn, *args, **kw):
+    """Full-width widget on any Streamlit version. The argument changed across releases:
+    use_column_width (old st.image) -> use_container_width -> width="stretch" (current)."""
+    import inspect
+
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        params = {}
+    w = params.get("width")
+    if w is not None and isinstance(w.default, str):  # current API: width="stretch" | "content" | px
+        kw["width"] = "stretch"
+    elif "use_container_width" in params:
+        kw["use_container_width"] = True
+    elif "use_column_width" in params:
+        kw["use_column_width"] = True
+    return fn(*args, **kw)
+
+
 def _cli_source():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default=None)
@@ -51,16 +70,16 @@ with st.sidebar:
     st.subheader("Guided Build")
     pid = st.selectbox("Project", list(rt.projects), format_func=lambda k: rt.projects[k].title)
     c1, c2 = st.columns(2)
-    if c1.button("▶ Start", use_container_width=True):
+    if wide(c1.button, "▶ Start"):
         rt.start_project(pid)
-    if c2.button("■ Stop", use_container_width=True):
+    if wide(c2.button, "■ Stop"):
         rt.stop_project()
     c3, c4, c5 = st.columns(3)
-    if c3.button("👍 Next", use_container_width=True):
+    if wide(c3.button, "👍 Next"):
         rt.next_step()
-    if c4.button("✋ Repeat", use_container_width=True):
+    if wide(c4.button, "✋ Repeat"):
         rt.repeat()
-    if c5.button("✊ Quiet", use_container_width=True):
+    if wide(c5.button, "✊ Quiet"):
         rt.stop_talking()
 
     st.subheader("System")
@@ -78,7 +97,7 @@ def video_panel():
     if snap.frame is None:
         st.info("Waiting for camera… (check vision.camera_index in config.yaml)")
         return
-    st.image(cv2.cvtColor(snap.frame, cv2.COLOR_BGR2RGB), use_container_width=True)
+    wide(st.image, cv2.cvtColor(snap.frame, cv2.COLOR_BGR2RGB))
     g = snap.guided
     if g:
         st.markdown(f"**{g['project']}** — step {g['step']}/{g['total']}: {g['instruction']}")
@@ -115,7 +134,7 @@ with right:
     q = st.chat_input("Ask about the part you're pointing at (e.g. 'which pin is ground?')")
     if q:
         rt.ask(q)
-    if st.button("🎤 Ask by voice", use_container_width=True):
+    if wide(st.button, "🎤 Ask by voice"):
         rt.listen_and_ask()
     with st.expander("📄 Source page for the last answer", expanded=True):
         cites = rt.last_citations
@@ -129,7 +148,7 @@ with right:
                     import fitz  # PyMuPDF
 
                     page = fitz.open(str(pdf))[c.page - 1]
-                    st.image(page.get_pixmap(dpi=100).tobytes("png"), use_container_width=True)
+                    wide(st.image, page.get_pixmap(dpi=100).tobytes("png"))
                 except Exception:
                     st.text(c.snippet[:800])
         else:

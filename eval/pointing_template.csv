@@ -1,0 +1,5 @@
+image,target_label
+# One row per trial: a photo (or video frame) of your hand pointing at one part, and the part you meant.
+# Example rows (replace with your own photos in eval/pointing/):
+# eval/pointing/ic_01.jpg,ic
+# eval/pointing/led_01.jpg,led

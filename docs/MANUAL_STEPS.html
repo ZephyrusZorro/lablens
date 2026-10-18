@@ -1,0 +1,204 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>LabLens: what needs a human</title><style>
+:root { color-scheme: light dark; --fg:#1d232b; --bg:#fbfbfa; --muted:#5b6672; --line:#d9dde2; --accent:#0b6e4f;
+        --code:#f0f2f4; }
+@media (prefers-color-scheme: dark) { :root { --fg:#e6e9ec; --bg:#16191d; --muted:#9aa4ae; --line:#2e343b;
+        --accent:#5cc79d; --code:#22272d; } }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+h1 { font-size: 2rem; margin: .2em 0 .6em; } h2 { margin-top: 2.2em; border-bottom: 1px solid var(--line);
+     padding-bottom: .3em; } h3 { margin-top: 1.6em; }
+a { color: var(--accent); } hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0; }
+code { background: var(--code); padding: .1em .35em; border-radius: 4px; font-size: .92em; }
+pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--code); } blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--accent);
+     color: var(--muted); }
+</style></head><body><main><h1>LabLens: what needs a human</h1>
+<p>Everything here needs your accounts, your computer, your hardware or your judgement. For each item: <strong>why</strong>
+it couldn't be automated, <strong>exactly what to do</strong>, and <strong>how long</strong> it takes. Work top to bottom.</p>
+<p><strong>Already done for you:</strong> all code, the knowledge base, 4 guided projects, one-click Windows setup and
+launch scripts, the self-check, 58 passing tests, CI, retrieval evaluation (88% correct page first),
+model download and conversion (verified), sample demo data, and a local git commit in this folder.</p>
+<hr />
+<h2>Before the event: must do</h2>
+<h3>1. Run setup on your laptop and check it works · 15 min · MUST</h3>
+<p><strong>Why:</strong> I built and tested everything on Linux (Python 3.10 and 3.13). I could not run the Windows
+<code>.bat</code> files, a real webcam, a microphone, speakers or MediaPipe hand tracking.</p>
+<ol>
+<li>Double-click <code>setup_windows.bat</code> (needs internet). If it says Python is missing, see step 2.</li>
+<li>Run <code>run_lablens.bat doctor</code>. Every line should be <code>OK</code> (<code>WARN</code> for LLM is fine until steps 3–4).</li>
+<li>Run <code>run_lablens.bat demo</code>: an annotated photo opens and the answer cites the manual.</li>
+<li>Run <code>run_lablens.bat</code>: point at a part, check it <strong>LOCKS</strong>, press <code>SPACE</code>, ask "which leg is positive?"</li>
+<li>Test 👍 ✋ ✊ in front of the camera.</li>
+</ol>
+<p>If anything fails, copy the red error text: it names the file and line.</p>
+<h3>2. Install Python 3.11 (only if setup says so) · 5 min</h3>
+<p><strong>Why:</strong> installing software on Windows needs your approval.</p>
+<p>Get it from <a href="https://www.python.org/downloads/">https://www.python.org/downloads/</a> and <strong>tick "Add python.exe to PATH"</strong>. Python 3.13 does
+not work yet (MediaPipe has no 3.13 build).</p>
+<h3>3. Get a free Groq API key (fast online answers + speech) · 3 min · strongly recommended</h3>
+<p><strong>Why:</strong> creating accounts and API keys needs you; I am not allowed to.</p>
+<ol>
+<li>Sign in at <a href="https://console.groq.com">https://console.groq.com</a> → <strong>API Keys</strong> → <strong>Create API Key</strong>.</li>
+<li>Open <code>.env</code> in this folder with Notepad and set <code>GROQ_API_KEY=gsk_...</code> (no quotes, no spaces).</li>
+<li>Never commit <code>.env</code> or paste the key anywhere public. <code>.gitignore</code> already excludes it.</li>
+</ol>
+<p>Without a key: answers come from Ollama (step 4) or as quoted manual sentences.</p>
+<h3>4. Install Ollama for offline answers · 10 min (≈2 GB download) · recommended</h3>
+<p><strong>Why:</strong> installing desktop software needs you.</p>
+<ol>
+<li>Install from <a href="https://ollama.com/download">https://ollama.com/download</a>. Your PC has an <code>.ollama</code> folder, so it may already be there.</li>
+<li>In a terminal: <code>ollama pull llama3.2:3b</code></li>
+<li><code>run_lablens.bat doctor</code> should now show <code>ollama llama3.2:3b</code>.</li>
+</ol>
+<p>This is what makes the "pull the Wi-Fi and it still answers properly" moment work.</p>
+<h3>5. Push to GitHub (<code>zephruszorro/lablens</code>) · 2 min · MUST if judges want a link</h3>
+<p><strong>Why I couldn't:</strong> the GitHub token in my environment was invalid, my GitHub connection only covers the
+<code>codingclub-aitm</code> organisation, and the browser on your PC isn't signed in to GitHub. I won't handle your
+password. Everything is already committed locally (branch <code>main</code>).</p>
+<p>In a terminal opened in this <code>lablens</code> folder, either:</p>
+<pre><code>gh auth login
+gh repo create lablens --private --source . --push
+</code></pre>
+<p>or create an <strong>empty</strong> repo named <code>lablens</code> at <a href="https://github.com/new">https://github.com/new</a> (no README, no .gitignore), then:</p>
+<pre><code>git remote add origin https://github.com/zephruszorro/lablens.git
+git push -u origin main
+</code></pre>
+<p>Then, optionally:</p>
+<ul>
+<li>make it public: repo <strong>Settings → General → Change visibility</strong></li>
+<li>add a description and the topics <code>computer-vision</code>, <code>rag</code>, <code>education</code>, <code>yolov8</code></li>
+<li>CI runs automatically (tab <strong>Actions</strong>). It downloads the models from GitHub and runs the tests on
+  Python 3.10–3.12.</li>
+</ul>
+<p>The model weights are <strong>not</strong> committed, on purpose (see step 10). Setup downloads them.</p>
+<h3>6. Physical bench setup · 30 min · MUST</h3>
+<p><strong>Why:</strong> hardware.</p>
+<ul>
+<li>Mount the camera <strong>looking straight down</strong> about 35–50 cm above the breadboard (phone stand, desk
+  lamp arm, or tape it to a shelf). Side views roughly halve detection quality.</li>
+<li>Put a desk lamp on the bench and avoid glare from overhead lights on the shiny IC.</li>
+<li>Use a plain, matte background around the breadboard.</li>
+<li>Rehearse the 2-minute script in <a href="RUN_GUIDE.html">RUN_GUIDE.md §5</a> <strong>at least 3 times</strong>, including
+  the camera-failure fallback (<code>run_lablens.bat photo</code>).</li>
+<li>Bring a phone hotspot in case the venue Wi-Fi blocks Groq or GitHub.</li>
+</ul>
+<hr />
+<h2>To raise accuracy (the biggest win for judging)</h2>
+<h3>7. Photograph and label your own kit, then fine-tune · 3–4 h · high impact</h3>
+<p><strong>Why I couldn't:</strong> it needs photos of <em>your</em> parts under <em>your</em> lighting, plus a GPU or Colab to train.
+Dataset hosts (Roboflow, Hugging Face) were blocked from my environment, and PyTorch couldn't be
+installed there.</p>
+<p>The detectors are trained on other people's photos. They report mAP@0.5 of 0.71 and 0.78 on <em>their</em>
+data, and on sample photos I saw both misses and wrong labels. Your own data fixes this.</p>
+<ol>
+<li>Take <strong>150–300 photos</strong> from the mounted camera: different part placements, 1–8 parts per
+   photo, hands in some shots, a few with the lamp off.</li>
+<li>Label them in Roboflow (free) or CVAT with these exact class names:
+   <code>resistor, led, capacitor, ic, diode, transistor</code>.</li>
+<li>Export in <strong>YOLOv8</strong> format and download the zip.</li>
+<li>Train, either:
+   * <strong>Google Colab (free GPU, ~30 min):</strong> upload this repo and your dataset, then run
+     <code>pip install ultralytics</code> and <code>python scripts/train_yolo.py --data &lt;dataset&gt;/data.yaml</code>
+   * <strong>Your laptop (CPU, a few hours):</strong> <code>pip install -r requirements-train.txt</code>, then the same command.</li>
+<li>Copy the resulting <code>models/my_kit.pt</code> into this folder's <code>models\</code>, and add it to <code>config.yaml</code> under
+   <code>vision: models:</code> (the script prints the exact lines; give it <code>weight: 1.5</code>). It converts to ONNX
+   by itself on first start.</li>
+<li>Measure it: hold back ~30 labelled photos and run
+   <code>python scripts/evaluate.py yolo --weights models/my_kit.pt --data &lt;dataset&gt;/data.yaml</code>.
+   Put that mAP on your slide: "trained on our own lab's components".</li>
+</ol>
+<h3>8. Measure pointing accuracy · 30 min · high impact</h3>
+<p><strong>Why:</strong> needs your hand, your camera and your parts.</p>
+<ol>
+<li>Take 50 photos from the demo camera, each with your finger pointing at one part.</li>
+<li>Save them in <code>eval\pointing\</code> and list them in <code>eval\pointing.csv</code> (copy <code>eval/pointing_template.csv</code>):
+   <code>eval/pointing/ic_01.jpg,ic</code></li>
+<li>Run <code>python scripts/evaluate.py pointing eval/pointing.csv</code> → "Pointing accuracy: 46/50 = 92%".</li>
+</ol>
+<h3>9. Measure voice latency · 5 min</h3>
+<p><strong>Why:</strong> needs your Groq key (step 3) and Ollama (step 4) on your machine.</p>
+<p>Run <code>python scripts/evaluate.py latency -n 20</code>. It prints time-to-first-token for Groq and for Ollama.</p>
+<hr />
+<h2>Decisions only you can make</h2>
+<h3>10. Model licensing · decide before any public or commercial use</h3>
+<p>The two detector models come from GitHub users <strong>hassanmroueh2003</strong> and <strong>ravi-ranjan707089</strong>. Neither
+repository states a licence, which by default means all rights reserved. What I did: the weights are
+<strong>not</strong> in this repo. <code>setup_models.py</code> downloads them from the authors' repos at pinned commits (SHA-256
+checked) for your own use, and the README credits both authors.</p>
+<ul>
+<li>For a college event this is normally fine. Credit them on a slide.</li>
+<li>For anything beyond that, open an issue on their repos asking for a licence, <strong>or</strong> use only your own
+  model from step 7 (remove theirs from <code>config.yaml</code>).</li>
+</ul>
+<h3>11. Choose a licence for your code · 2 min</h3>
+<p>I did not pick one, because it's your decision. If you want others to reuse LabLens, add a <code>LICENSE</code>
+file. On GitHub: <strong>Add file → Create new file → name it LICENSE → Choose a license template</strong> (MIT is
+the common choice for student projects).</p>
+<h3>12. Check the lab manual against your lab · 20 min</h3>
+<p><code>knowledge/lab_manual.md</code> holds typical values, which I checked against standard datasheet figures
+(BC547 C-B-E, 2N2222 E-B-C, NE555 and LM358 pinouts, 555 timing, Arduino limits). Your lab's parts or
+procedures may differ:</p>
+<ul>
+<li>Ask your instructor for the official lab manual or experiment sheets (PDF) and drop them into
+  <code>data\datasheets\</code>, then run <code>python scripts/build_manual.py</code>.</li>
+<li>Add the datasheets for the exact part numbers in your kit (from the manufacturer, e.g. ti.com, onsemi.com).</li>
+</ul>
+<h3>13. Hindi / Kannada voice · 10 min · optional</h3>
+<p>Set <code>language: hi</code> or <code>kn</code> under <code>audio:</code> in <code>config.yaml</code>. This needs internet (gTTS) and the Groq
+or Ollama LLM for translation. Have a native speaker check the technical terms before showing it.</p>
+<hr />
+<h2>Things I couldn't verify (be ready for these)</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Status</th>
+<th>What to watch</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows <code>.bat</code> files</td>
+<td>Written for Windows cmd (CRLF), never executed</td>
+<td>Step 1</td>
+</tr>
+<tr>
+<td>Live webcam + MediaPipe hands</td>
+<td>Logic unit-tested and run on a photo with simulated pointing; not on a real camera</td>
+<td>Pointing jitter: raise <code>pointing.dwell_seconds</code></td>
+</tr>
+<tr>
+<td>Microphone / Whisper / TTS voices</td>
+<td>Code paths written; no audio hardware in my environment</td>
+<td><code>doctor</code>, then <code>SPACE</code></td>
+</tr>
+<tr>
+<td>Groq / Ollama answers</td>
+<td>Router and fallbacks tested; no LLM reachable from my environment</td>
+<td>Answers in LLM mode were not reviewed by me: try the demo questions</td>
+</tr>
+<tr>
+<td>Detector on your bench</td>
+<td>Ran on the authors' sample photos only</td>
+<td>Step 7</td>
+</tr>
+<tr>
+<td>Resistor colour bands</td>
+<td>Passes 24 synthetic tests; untested on real photos</td>
+<td>Treat readings as a hint, not truth</td>
+</tr>
+<tr>
+<td>Datasheet scraper</td>
+<td>Code written; web search was blocked in my environment</td>
+<td>Don't rely on it in the demo</td>
+</tr>
+<tr>
+<td>Streamlit web UI</td>
+<td>Made compatible with old and new Streamlit APIs; not launched</td>
+<td>Use the desktop window for the live demo</td>
+</tr>
+</tbody>
+</table></main></body></html>
