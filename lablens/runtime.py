@@ -67,6 +67,7 @@ class FrameSource:
         backend = cv2.CAP_DSHOW if isinstance(src, int) and hasattr(cv2, "CAP_DSHOW") and _is_windows() else cv2.CAP_ANY
         self.cap = cv2.VideoCapture(src, backend)
         if isinstance(src, int):
+            self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)

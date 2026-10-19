@@ -8,21 +8,21 @@ vision:
     - path: models/components_v8n_6cls.onnx   # capacitor, diode, LED, resistor, transistor, zener
       imgsz: 800
       weight: 1.0
-      conf: 0.20
+      conf: 0.16
     - path: models/components_v8s_4cls.onnx   # capacitor, IC, LED, resistor
       imgsz: 640
       weight: 1.0
-      conf: 0.20
+      conf: 0.16
   ensemble:
-    conf: 0.35               # output threshold after weighted box fusion
+    conf: 0.22               # output threshold after weighted box fusion (sensitive for small bench parts)
     iou_fuse: 0.5
-    max_area_frac: 0.25      # reject boxes covering >25% of the frame (top-down bench parts are small)
-    single_model_penalty: 0.7
+    max_area_frac: 0.40      # allow full breadboard coverage
+    single_model_penalty: 0.85 # do not penalize classes known by only one model
     slice_grid: 0            # 2 = 2x2 tiled inference + full frame (better for small parts, ~5x slower)
   breadboard_cv: true        # classical breadboard detector (no model needed)
   humans:
     enabled: true
-    scene_mode: auto       # auto = electronics only on a board when people are visible; mixed | people
+    scene_mode: mixed       # mixed = detects all electronics on bench & desk; auto | people
     person_model: models/person_yolov8n.onnx
     pose_model: models/pose_landmarker_lite.task
     face_model: models/blaze_face_short_range.tflite
@@ -30,8 +30,8 @@ vision:
     max_poses: 6
     show_body: false          # opt in to skeleton overlays
   camera_index: 0
-  camera_width: 1280
-  camera_height: 720
+  camera_width: 640
+  camera_height: 480
   mock: false                # true = fixed fake detections, no models needed
 
 pointing:

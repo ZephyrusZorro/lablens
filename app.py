@@ -74,7 +74,7 @@ def cli_args():
 
 
 args = cli_args()
-MODES = {"Auto: bench and people": "auto", "People and body parts": "people", "Mixed: loose components": "mixed"}
+MODES = {"Bench & loose components (All parts)": "mixed", "Auto: breadboard focus": "auto", "People & body parts": "people"}
 
 
 @st.cache_resource(scope="session", max_entries=1, on_release=lambda runtime: runtime.stop())
@@ -175,7 +175,7 @@ with diagnostics_slot:
 left, right = st.columns([1.7, 1], gap="large")
 
 
-@st.fragment(run_every=0.2)
+@st.fragment(run_every=0.35)
 def video_panel():
     snap = rt.snapshot()
     with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
@@ -191,7 +191,12 @@ def video_panel():
             st.markdown(":material/videocam_off:")
             st.caption("Waiting for the camera. Your workspace will appear here.")
     else:
-        ok, jpg = cv2.imencode(".jpg", snap.frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        disp = snap.frame
+        h, w = disp.shape[:2]
+        if w > 640:
+            scale = 640 / w
+            disp = cv2.resize(disp, (640, int(h * scale)), interpolation=cv2.INTER_AREA)
+        ok, jpg = cv2.imencode(".jpg", disp, [cv2.IMWRITE_JPEG_QUALITY, 68])
         st.image("data:image/jpeg;base64," + base64.b64encode(jpg).decode("ascii"), width="stretch",
                   alt="Camera annotated with detected people, visible body parts and lab components")
         with st.container(horizontal=True, horizontal_alignment="distribute"):
@@ -226,7 +231,7 @@ def focus_panel():
         st.caption("Point with one hand, or refresh the list and choose a part.")
 
 
-@st.fragment(run_every=0.5)
+@st.fragment(run_every=1.5)
 def conversation():
     snap = rt.snapshot()
     messages = list(rt.messages)[-30:]
@@ -257,7 +262,7 @@ def question_input():
         rt.ask(question)
 
 
-@st.fragment(run_every=0.5)
+@st.fragment(run_every=1.0)
 def voice_panel():
     st.markdown("**Record a question**")
     st.caption("Speak naturally. Review your words before asking.")
@@ -283,7 +288,7 @@ def voice_panel():
     st.caption("Record → stop → review → ask. Up to 60 seconds. Choose your physical mic in the browser.")
 
 
-@st.fragment(run_every=0.5)
+@st.fragment
 def source_panel():
     st.subheader("Manual references")
     cites = rt.last_citations
@@ -305,7 +310,7 @@ def source_panel():
             st.text(citation.snippet[:800])
 
 
-@st.fragment(run_every=1)
+@st.fragment(run_every=1.5)
 def build_panel():
     st.subheader("Build instructions")
     st.caption("One step at a time. Visual checks along the way.")
