@@ -20,6 +20,15 @@ vision:
     single_model_penalty: 0.7
     slice_grid: 0            # 2 = 2x2 tiled inference + full frame (better for small parts, ~5x slower)
   breadboard_cv: true        # classical breadboard detector (no model needed)
+  humans:
+    enabled: true
+    scene_mode: auto       # auto = electronics only on a board when people are visible; mixed | people
+    person_model: models/person_yolov8n.onnx
+    pose_model: models/pose_landmarker_lite.task
+    face_model: models/blaze_face_short_range.tflite
+    visibility: 0.55
+    max_poses: 6
+    show_body: false          # opt in to skeleton overlays
   camera_index: 0
   camera_width: 1280
   camera_height: 720
@@ -33,16 +42,20 @@ pointing:
   nearest_max_px: 120      # if the ray hits nothing, accept nearest box within this distance
 
 gestures:
+  enabled: false             # enable explicitly; crowds always disable shortcuts
   hold_frames: 6           # gesture must be stable this many frames
   cooldown_seconds: 1.5
 
 audio:
-  stt_backend: auto        # auto | groq | faster_whisper
+  stt_backend: faster_whisper  # local recognition avoids unavailable online STT
   whisper_local_model: base.en
   tts_backend: auto        # auto | pyttsx3 | gtts | piper | none
   piper_model: models/piper/en_US-lessac-medium.onnx
   language: en             # en | hi | kn  (stage 4: Hindi / Kannada answers)
-  record_seconds: 6
+  record_seconds: 12
+  input_device: null        # null = prefer physical mic; index/name selects explicitly
+  silence_seconds: 1.2
+  speech_threshold: 0.004
 
 rag:
   pdf_dir: data/datasheets

@@ -38,10 +38,13 @@ class GroqBackend:
             self._client = Groq(api_key=self.api_key, timeout=self.timeout, max_retries=0)
         resp = self._client.chat.completions.create(model=self.model, messages=messages, stream=True,
                                                     temperature=self.temperature, max_tokens=500)
-        for ev in resp:
-            delta = ev.choices[0].delta.content if ev.choices else None
-            if delta:
-                yield delta
+        try:
+            for ev in resp:
+                delta = ev.choices[0].delta.content if ev.choices else None
+                if delta:
+                    yield delta
+        finally:
+            resp.close()
 
 
 class OllamaBackend:
@@ -111,6 +114,7 @@ class LLMRouter:
         self.last_backend = ""
         self.last_ttft = 0.0  # time to first token, seconds
         self.forced: Optional[str] = None  # "groq" | "ollama" | None (demo toggle)
+        self._failed_until = {}
 
     @classmethod
     def from_config(cls, cfg) -> "LLMRouter":
@@ -129,23 +133,31 @@ class LLMRouter:
         if "groq" in names and (g is None or not g.configured or not is_online(self.online_ttl)):
             names.remove("groq")
             names.append("groq")  # last resort only
-        return [n for n in names if n in self.backends]
+        return [n for n in names if n in self.backends
+                and (n != "groq" or self.backends[n].configured)
+                and time.monotonic() >= self._failed_until.get(n, 0)]
 
     def stream(self, messages: Messages) -> Iterator[str]:
         errors = []
+        self.last_backend = ""
+        self.last_ttft = 0.0
         for name in self.order():
             b = self.backends[name]
             t0 = time.perf_counter()
             gen = b.stream(messages)
             try:
-                first = next(gen)
+                first = next(t for t in gen if t and t.strip())
             except StopIteration:
-                first = ""
+                errors.append(f"{name}: empty response")
+                self._failed_until[name] = time.monotonic() + 30
+                continue
             except Exception as e:
                 errors.append(f"{name}: {e}")
                 log.warning("LLM backend %s failed before first token: %s", name, e)
-                if name == "groq":
-                    mark_offline()
+                # An invalid key / HTTP 404 is a service failure, not evidence
+                # that every network feature is offline. Avoid retrying it on
+                # every question while allowing the local model immediately.
+                self._failed_until[name] = time.monotonic() + 60
                 continue
             self.last_backend, self.last_ttft = name, time.perf_counter() - t0
             yield first

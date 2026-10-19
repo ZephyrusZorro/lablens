@@ -23,12 +23,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default=None)
     ap.add_argument("--no-voice", action="store_true")
+    ap.add_argument("--input-device", default=None, help="Microphone index or name for SPACE recording")
     a = ap.parse_args()
     cfg = get_config()
     from lablens.runtime import Runtime
 
     rt = Runtime(cfg, source=a.source if a.source is not None else cfg.get("vision.camera_index", 0),
                  speak=not a.no_voice)
+    if a.input_device is not None:
+        rt.input_device = int(a.input_device) if a.input_device.isdigit() else a.input_device
     win = "LabLens"
     cv2.namedWindow(win, cv2.WINDOW_NORMAL)
     mouse_down = {"v": False}
@@ -66,6 +69,14 @@ def main() -> None:
                                            f"{'OK' if g['ok'] else ' '.join(g['messages'])[:60]}"))
             if typing:
                 lines.append(("you", "> " + buf + "_"))
+            if snap.listening:
+                lines.append(("you", "Listening... speak now"))
+            elif snap.transcribing:
+                lines.append(("you", "Transcribing locally..."))
+            if snap.audio_error:
+                lines.extend(("you", s) for s in textwrap.wrap(snap.audio_error, 95)[:3])
+            if snap.camera_error:
+                lines.append(("you", snap.camera_error))
             panel_h = 22 * len(lines) + 10
             if lines:
                 overlay = frame.copy()
@@ -77,6 +88,8 @@ def main() -> None:
                                 cv2.LINE_AA)
             cv2.imshow(win, frame)
             k = cv2.waitKey(15) & 0xFF
+            if cv2.getWindowProperty(win, cv2.WND_PROP_VISIBLE) < 1:
+                break
             if k == 255:
                 continue
             if typing:

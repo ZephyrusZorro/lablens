@@ -1,0 +1,106 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Human recognition and voice fixes - 19 October 2026</title><style>
+:root { color-scheme: light dark; --fg:#1d232b; --bg:#fbfbfa; --muted:#5b6672; --line:#d9dde2; --accent:#0b6e4f;
+        --code:#f0f2f4; }
+@media (prefers-color-scheme: dark) { :root { --fg:#e6e9ec; --bg:#16191d; --muted:#9aa4ae; --line:#2e343b;
+        --accent:#5cc79d; --code:#22272d; } }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+h1 { font-size: 2rem; margin: .2em 0 .6em; } h2 { margin-top: 2.2em; border-bottom: 1px solid var(--line);
+     padding-bottom: .3em; } h3 { margin-top: 1.6em; }
+a { color: var(--accent); } hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0; }
+code { background: var(--code); padding: .1em .35em; border-radius: 4px; font-size: .92em; }
+pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--code); } blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--accent);
+     color: var(--muted); }
+</style></head><body><main><h1>Human recognition and voice fixes - 19 October 2026</h1>
+<p>The app is running locally at http://127.0.0.1:8501. These changes are local and unpushed.
+This report supersedes the human/voice limitations in the earlier Windows validation snapshot.</p>
+<h2>Camera behavior</h2>
+<ul>
+<li>A separate, local YOLOv8n COCO model recognizes people, including distant or partly occluded people
+  that a pose-only model can miss. It never feeds a person box into electronics pointing/RAG.</li>
+<li>MediaPipe Pose Lite provides visible body landmarks and segmentation; a face detector supports
+  close webcam views. Overlays include human, head, torso, arms, legs, hands, feet and named joints
+  where sufficiently visible. Existing hand tracking also labels fingers. Left/right are anatomical.</li>
+<li>Human regions and detected furniture reject overlapping electronics predictions. Old component
+  tracks are filtered too, so a stale resistor box cannot linger over a newly recognized person.</li>
+<li><strong>Auto: bench and people</strong> is the default. If people are visible, electronics are shown only on a
+  detected breadboard outside human/furniture regions. <strong>People and body parts</strong> shows no electronics.
+  <strong>Mixed: loose components</strong> permits separate loose lab parts without requiring a board.</li>
+<li>Pointing locks clear when their component disappears or is reclassified. Manual component selection
+  remains available in the browser even when hand tracking works.</li>
+<li>Automatic gestures are disabled in people-only mode, during a request, and in Auto mode without a
+  visible breadboard, so a hand elsewhere in the room does not issue lab commands.</li>
+<li>Camera failure messages and session resource cleanup replace silent stale video and abandoned
+  camera/model workers. The desktop window's close button now performs normal shutdown.</li>
+</ul>
+<h2>Voice behavior</h2>
+<ul>
+<li>Browser <strong>Record your question</strong> captures browser microphone audio, rather than silently using a
+  server-side Windows input. Stop recording, review/edit <strong>Recognized text</strong>, then <strong>Ask this question</strong>.
+  The transcript is not automatically submitted. Recordings over 60 seconds are rejected with a message.</li>
+<li>Cached offline Whisper is reused across requests. Stereo and non-16-kHz recordings are converted
+  to mono 16 kHz, digital silence produces no invented question, and overlapping requests are blocked.</li>
+<li>Desktop SPACE recording uses native microphone sample rate, keeps pre-roll so the first syllable
+  is not cut off, tolerates quieter speech, and allows a longer question/trailing pause. Input can be
+  explicitly selected by index or name: <code>run_lablens.bat --input-device 2</code>.</li>
+<li>Automatic Windows selection prefers a physical microphone and warns when only a virtual cable is
+  available. A virtual cable can still be selected explicitly for an intentional routed-audio setup.</li>
+<li>Speech output stops before desktop recording. Listening/transcribing/errors are visible, and the
+  component selected when the request begins is preserved while recognition/answering runs.</li>
+<li>Browser speech output starts off to reduce recording feedback. <strong>Speak answers</strong> can be enabled
+  without rebuilding the camera pipeline or losing the conversation.</li>
+<li>Empty LLM responses now fail over; failed backends have a cooldown. A Groq API error no longer
+  marks every unrelated network feature offline. Doctor now probes the Groq API rather than declaring
+  it ready from the mere presence of a key.</li>
+</ul>
+<h2>Verification</h2>
+<ul>
+<li><strong>72 tests pass</strong>: original 58 plus 14 regressions covering person/mask/board confusion, hidden limbs,
+  human exclusion from pointing, stale locks, audio resampling, silence, virtual input selection,
+  concurrent questions, review-before-submit, empty-backend failover, background gestures and recording length limits.</li>
+<li>The <strong>live camera</strong> recognized two people in the room and excluded chair/breadboard false labels in
+  the inspected sequence. This is a live smoke test, not an accuracy benchmark.</li>
+<li>A public MediaPipe pose reference image produced head, torso, both arms/legs/hands/feet plus named
+  joints. Only visible joints are rendered. This is reference-image validation, not a measurement on
+  the user's body or a medical/anatomical assessment.</li>
+<li>A <strong>synthesized recording</strong> ran through the complete Runtime upload/transcription/review/answer path:
+  "Which pin is ground on the 555 timer?" -&gt; "Pin 1 is ground on the 555 timer." through Ollama, with
+  manual page 7 retrieved first. The runtime then shut down cleanly. Evidence: <code>data/voice_validation.json</code>.</li>
+<li>The original sample electronics photo still produces LED + breadboard detections with the new
+  models enabled. The browser rendered the live view, recognition modes and native recorder.</li>
+<li>A real browser recording completed and reached the transcriber, which correctly reported no speech
+  from the current input. This validates capture/stop/upload/error handling, not intelligible speech
+  from a physical microphone. An overlong recording also produced a clear length warning.</li>
+<li><code>pip check</code>, Python compilation and whitespace validation pass. New model downloads have fixed
+  source versions and SHA-256 verification in <code>scripts/setup_models.py</code>.</li>
+</ul>
+<h2>Remaining limits</h2>
+<ul>
+<li>Groq still returns HTTP 404 from this machine. Local Ollama answers and local Whisper work around it;
+  the key has not been claimed valid. No credential is included in source or this report.</li>
+<li>Windows currently exposes a virtual-cable default input, with no verified physical microphone.
+  A real spoken trial requires selecting/connecting the intended physical input. Synthetic speech
+  validation does not establish microphone quality, accent/noise accuracy or speaker audibility.</li>
+<li>Body parts outside the view, hidden behind desks, poorly lit or too small may be omitted. Recognition
+  is generic human/pose detection, not personal identity recognition. It is not infallible classification.</li>
+<li>Auto filtering may hide electronics held directly in front of the body; put parts on the bench.
+  The existing lab detectors still need kit-specific data for a measured accuracy claim. Guided Build
+  checks presence and approximate placement, not electrical connections.</li>
+<li>New Streamlit session cleanup uses the installed 1.66 API, now declared in requirements.</li>
+</ul>
+<h2>Model sources and credits</h2>
+<ul>
+<li><a href="https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt">Ultralytics YOLOv8n COCO model</a>,
+  converted locally to ONNX using the existing exporter. The model is distributed under
+  <a href="https://github.com/ultralytics/assets">Ultralytics' AGPL-3.0 terms</a>.</li>
+<li><a href="https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/python">Google MediaPipe Pose Landmarker</a>
+  (Pose Lite version 1) and
+  <a href="https://developers.google.com/edge/mediapipe/solutions/vision/face_detector/python">Face Detector</a>
+  (BlazeFace short-range version 1), executed locally through MediaPipe.</li>
+<li><a href="https://storage.googleapis.com/mediapipe-assets/pose.jpg">MediaPipe reference pose image</a>, used only
+  for the reference-image smoke test. Models and downloaded samples remain ignored by Git.</li>
+</ul></main></body></html>

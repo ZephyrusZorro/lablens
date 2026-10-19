@@ -13,6 +13,7 @@ from collections import Counter, deque
 from typing import Deque, Iterable, List, Optional, Tuple
 
 from lablens.types import Detection, HandObservation, Point, Selection
+from lablens.vision.humans import HUMAN_CLASSES
 
 CONTAINER_CLASSES = {"breadboard"}
 
@@ -50,7 +51,7 @@ def pointing_ray(hand: HandObservation, length_factor: float = 2.5) -> Tuple[Poi
 def resolve_pointed(hand: HandObservation, dets: Iterable[Detection], length_factor: float = 2.5,
                     nearest_max_px: float = 120.0) -> Optional[Detection]:
     """Single-frame decision."""
-    dets = list(dets)
+    dets = [d for d in dets if d.label not in HUMAN_CLASSES]
     if not dets:
         return None
     start, end = pointing_ray(hand, length_factor)
@@ -105,6 +106,10 @@ class PointingResolver:
 
     def update(self, hand: Optional[HandObservation], dets: List[Detection]) -> Optional[Selection]:
         now = self.clock()
+        dets = [d for d in dets if d.label not in HUMAN_CLASSES]
+        self._latest = {_key(d): d for d in dets}
+        if self.locked and _key(self.locked) not in self._latest:
+            self.clear()
         if hand is None:
             self.window.append(None)
             if self.locked and now - self._last_seen_hand <= self.sticky:

@@ -34,6 +34,7 @@ def check(name: str, core: bool = False):
 
 
 def main(argv=None) -> int:
+    RESULTS.clear()
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-camera", action="store_true")
     a = ap.parse_args(argv)
@@ -62,7 +63,18 @@ def main(argv=None) -> int:
         det.detect(frame)
         ms = (time.perf_counter() - t) * 1000
         classes = ", ".join(getattr(det, "classes", []))
+        if hasattr(det, "close"):
+            det.close()
         return ("OK" if ms < 600 else "WARN"), f"{ms:.0f} ms/frame on CPU; classes: {classes}"
+
+    @check("human recognition")
+    def _human():
+        from lablens.vision.humans import HumanDetector
+        h = HumanDetector(cfg)
+        detail = h.error or "YOLO person + MediaPipe face, pose and segmentation (local)"
+        ok = not h.error and h.available
+        h.close()
+        return ("OK" if ok else "WARN"), detail
 
     @check("hand tracking")
     def _hands():
@@ -92,8 +104,19 @@ def main(argv=None) -> int:
         r = LLMRouter.from_config(cfg)
         g, o = r.backends["groq"], r.backends["ollama"]
         parts = []
-        groq_ok = g.configured and is_online()
-        parts.append("groq " + ("ready" if groq_ok else ("no GROQ_API_KEY" if not g.configured else "offline")))
+        groq_ok = False
+        if g.configured and is_online():
+            try:
+                stream = g.stream([{"role": "user", "content": "Reply only OK."}])
+                try:
+                    groq_ok = bool(next(stream).strip())
+                finally:
+                    stream.close()
+                parts.append("groq API verified" if groq_ok else "groq empty response")
+            except Exception as e:
+                parts.append(f"groq unavailable ({getattr(e, 'status_code', type(e).__name__)})")
+        else:
+            parts.append("groq no key or offline")
         try:
             names = o.installed()
             parts.append(f"ollama {o.resolve_model()}" if names else "ollama running but no models")
@@ -116,11 +139,12 @@ def main(argv=None) -> int:
             return "WARN", "no STT backend - type questions instead"
         return "OK", ", ".join(x for x, ok in (("faster-whisper (offline)", have_fw), ("groq whisper", have_groq)) if ok)
 
-    @check("microphone")
+    @check("desktop microphone")
     def _mic():
         import sounddevice as sd
+        from lablens.audio.stt import resolve_input_device
 
-        d = sd.query_devices(kind="input")
+        d = sd.query_devices(resolve_input_device(cfg.get("audio.input_device")), kind="input")
         return "OK", d["name"]
 
     @check("text-to-speech")
@@ -130,7 +154,7 @@ def main(argv=None) -> int:
         backs = [n for n in ("pyttsx3", "gtts") if u.find_spec(n)]
         return ("OK" if backs else "WARN"), ", ".join(backs) or "none - answers shown as text only"
 
-    checks = [_py, _det, _hands, _kb, _llm, _stt, _mic, _tts]
+    checks = [_py, _det, _human, _hands, _kb, _llm, _stt, _mic, _tts]
 
     if not a.no_camera:
         @check("camera")

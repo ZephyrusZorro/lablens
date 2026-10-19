@@ -5,6 +5,33 @@ How to install, run, operate and demo LabLens. The jobs only you can do are in
 
 ---
 
+## Human recognition and revised voice controls (19 October 2026)
+
+The refreshed browser workspace opens with settings collapsed. Use the **double-arrow sidebar
+button** at the top-left for camera source, recognition mode, answer engine and speech output.
+The main workspace contains the live camera, **Focus component**, **Lab assistant**, **Voice studio**,
+**Guided build**, and **Sourcebook**. The four status cards use live runtime data; the cited page is
+available under **Read cited page** after an answer.
+
+In the browser, choose **Live camera** and **Auto: bench and people**. Human boxes and visible body
+landmarks are independent of the component detector. **People and body parts** hides electronics
+labels entirely. **Mixed: loose components** permits loose electronics outside a breadboard;
+use it for a close-up bench view. Hidden limbs are not presented as visible detections.
+
+For voice input in the browser, use **Record your question**, stop recording, review/edit
+**Recognized text**, then click **Ask this question**. Keep recordings under 60 seconds.
+**Speak answers** starts off in the browser to reduce microphone feedback; turn it on when needed.
+Recognition runs with cached local Whisper, so the unavailable Groq endpoint does not block it.
+Select the physical microphone in your browser if the recording is silent. The desktop SPACE key
+still records through a Windows input; select a microphone explicitly with
+`run_lablens.bat --input-device 2` (replace 2 with its actual device index).
+
+The Windows default input on the tested machine was a virtual cable. The updated doctor warns
+about that; an open virtual input is not proof of working microphone capture. See
+[HUMAN_VOICE_FIXES.md](HUMAN_VOICE_FIXES.md) for validation and limits.
+
+---
+
 ## 1. What you need
 
 | | Requirement |

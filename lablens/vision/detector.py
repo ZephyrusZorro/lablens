@@ -86,15 +86,19 @@ class BaseDetector:
 class ComponentDetector(BaseDetector):
     name = "ensemble"
 
-    def __init__(self, ensemble, breadboard=None, tracker: Optional[IouTracker] = None):
+    def __init__(self, ensemble, breadboard=None, tracker: Optional[IouTracker] = None, humans=None):
         self.ensemble = ensemble
         self.breadboard = breadboard
         self.tracker = tracker or IouTracker()
         self.last_ms = 0.0
+        self.humans = humans
+        self.human_tracker = IouTracker(max_missed=1, smooth=0.15, min_hits=2)
 
     @property
     def classes(self) -> List[str]:
-        return sorted(set(self.ensemble.classes) | ({"breadboard"} if self.breadboard else set()))
+        from lablens.vision.humans import HUMAN_CLASSES
+        return sorted(set(self.ensemble.classes) | ({"breadboard"} if self.breadboard else set())
+                      | (HUMAN_CLASSES if self.humans and self.humans.available else set()))
 
     def detect_raw(self, frame: np.ndarray) -> List[Detection]:
         t0 = time.perf_counter()
@@ -103,11 +107,29 @@ class ComponentDetector(BaseDetector):
             bb = self.breadboard(frame)
             if bb is not None:
                 dets.append(bb)
+        if self.humans is not None:
+            from lablens.vision.humans import filter_components
+            human = self.humans.detect(frame)
+            dets = filter_components(dets, human, scene_mode=self.humans.scene_mode) + human.detections
         self.last_ms = (time.perf_counter() - t0) * 1000
         return dets
 
     def detect(self, frame: np.ndarray) -> List[Detection]:
-        return self.tracker.update(self.detect_raw(frame))
+        from lablens.vision.humans import HUMAN_CLASSES, filter_components
+        raw = self.detect_raw(frame)
+        parts = self.tracker.update([d for d in raw if d.label not in HUMAN_CLASSES])
+        # People move; anatomy belongs to the current pose, not an independent track.
+        people = self.human_tracker.update([d for d in raw if d.label == "person"])
+        people = [Detection(d.label, d.conf, d.x1, d.y1, d.x2, d.y2, d.track_id + 1_000_000)
+                  for d in people]
+        anatomy = [d for d in raw if d.label in HUMAN_CLASSES - {"person"}]
+        if self.humans is not None:
+            parts = filter_components(parts, self.humans.last, scene_mode=self.humans.scene_mode)
+        return parts + people + anatomy
+
+    def close(self):
+        if self.humans is not None:
+            self.humans.close()
 
 
 class MockDetector(BaseDetector):
@@ -144,6 +166,8 @@ class AsyncDetector:
         self._stop = False
         self.fps = 0.0
         self.updated_at = 0.0
+        self.sequence = 0
+        self.error = ""
         self._t = threading.Thread(target=self._loop, daemon=True, name="lablens-detector")
         self._t.start()
 
@@ -153,6 +177,8 @@ class AsyncDetector:
             self._cv.notify()
 
     def latest(self) -> List[Detection]:
+        if not self.updated_at or time.monotonic() - self.updated_at > 2.0:
+            return []
         return list(self._result)
 
     def _loop(self) -> None:
@@ -166,11 +192,15 @@ class AsyncDetector:
             t0 = time.perf_counter()
             try:
                 self._result = self.detector.detect(frame)
+                self.error = ""
             except Exception as e:  # never kill the UI because of one bad frame
+                self._result = []
+                self.error = f"Recognition unavailable: {e}"
                 log.exception("detector failed: %s", e)
             dt = time.perf_counter() - t0
             self.fps = 0.8 * self.fps + 0.2 * (1.0 / max(dt, 1e-3))
             self.updated_at = time.monotonic()
+            self.sequence += 1
 
     def close(self, timeout: float = 3.0) -> None:
         """Stop the worker and wait for an in-flight inference to finish, so the ONNX sessions are
@@ -180,6 +210,8 @@ class AsyncDetector:
             self._cv.notify()
         if self._t.is_alive() and threading.current_thread() is not self._t:
             self._t.join(timeout)
+        if not self._t.is_alive() and hasattr(self.detector, "close"):
+            self.detector.close()
 
 
 def _resolve_model(path: Path) -> Optional[Path]:
@@ -215,13 +247,14 @@ def build_detector(cfg) -> BaseDetector:
                                float(m.get("conf", 0.2))))
     if not specs:
         log.warning("No detection models found - using MockDetector. Run: python scripts/setup_models.py")
-        return MockDetector()
+        raise RuntimeError("Component models missing. Run scripts/setup_models.py; mock mode must be explicitly enabled.")
     e = cfg.get("vision.ensemble", {}) or {}
     ens = ComponentEnsemble(specs, EnsembleConfig(
         iou_fuse=e.get("iou_fuse", 0.5), conf_out=e.get("conf", 0.30), max_area_frac=e.get("max_area_frac", 0.25),
         slice_grid=e.get("slice_grid", 0), single_model_penalty=e.get("single_model_penalty", 0.8)))
     bb = BreadboardDetector() if cfg.get("vision.breadboard_cv", True) else None
-    return ComponentDetector(ens, bb)
+    from lablens.vision.humans import HumanDetector
+    return ComponentDetector(ens, bb, humans=HumanDetector(cfg))
 
 
 def _abs(cfg, p: str) -> Path:

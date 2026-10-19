@@ -104,6 +104,35 @@ def setup_hands() -> None:
         print(f"[warn] could not download hand model ({e}); the legacy MediaPipe API or mouse pointing will be used")
 
 
+def setup_humans() -> None:
+    from lablens.vision.export import export
+    person = MODELS / "person_yolov8n.pt"
+    person_url = "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt"
+    person_sha = "f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36"
+    if not (person.exists() and sha256(person) == person_sha):
+        download(person_url, person)
+        if sha256(person) != person_sha:
+            person.unlink(missing_ok=True)
+            raise ValueError("Person model checksum mismatch")
+    if not person.with_suffix('.onnx').exists():
+        export(person, person.with_suffix('.onnx'), {"source": person_url, "credit": "Ultralytics YOLOv8n COCO, AGPL-3.0"})
+    print("[ok] YOLOv8n person model verified (Ultralytics, AGPL-3.0)")
+    models = [
+        ("pose_landmarker_lite.task", "pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+         "59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a"),
+        ("blaze_face_short_range.tflite", "face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+         "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f"),
+    ]
+    for name, url, digest in models:
+        dest = MODELS / name
+        if not (dest.exists() and sha256(dest) == digest):
+            download("https://storage.googleapis.com/mediapipe-models/" + url, dest)
+            if sha256(dest) != digest:
+                dest.unlink(missing_ok=True)
+                raise ValueError(f"Human model checksum mismatch: {name}")
+        print(f"[ok] {name} verified (Google MediaPipe, version 1)")
+
+
 SAMPLE = {
     # Real bench photo from the model author's repo (pinned commit, SHA-256), used by `run_lablens.bat demo`.
     # It is a phone-screen capture that already shows the author's own boxes; it is a smoke test, not a benchmark.
@@ -168,6 +197,7 @@ def main() -> None:
                          " try a phone hotspot), then run this script again.")
     if not a.skip_hands:
         setup_hands()
+    setup_humans()
     setup_sample()
     if not a.skip_speech:
         setup_speech()

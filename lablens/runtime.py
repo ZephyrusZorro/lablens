@@ -13,7 +13,7 @@ import collections
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Deque, List, Optional, Tuple, Union
 
@@ -24,6 +24,11 @@ from lablens.types import Detection, HandObservation, Selection
 
 log = logging.getLogger(__name__)
 Source = Union[int, str]
+
+
+def gesture_controls_allowed(dets, scene_mode, busy=False):
+    return (not busy and sum(d.label == "person" for d in dets) <= 1 and scene_mode != "people" and
+            (scene_mode == "mixed" or any(d.label == "breadboard" for d in dets)))
 
 
 @dataclass
@@ -38,6 +43,12 @@ class Snapshot:
     guided: Optional[dict] = None
     busy: bool = False
     resistor_reading: Optional[str] = None
+    listening: bool = False
+    transcribing: bool = False
+    camera_error: str = ""
+    last_transcript: str = ""
+    audio_error: str = ""
+    transcript_id: int = 0
 
 
 class FrameSource:
@@ -114,9 +125,27 @@ class Runtime:
         self.last_citations = []
         self._lock = threading.Lock()
         self._snap = Snapshot(hand_backend=self.hands.backend)
+        self.show_body = cfg.get("vision.humans.show_body", False)
+        self.gestures_enabled = cfg.get("gestures.enabled", False)
+        self._manual_track = None
+        if getattr(self.detector, "humans", None) is not None:
+            self.detector.humans.pose_enabled = self.show_body
         self._mouse: Optional[Tuple[float, float]] = None
         self._stop = threading.Event()
         self._busy = threading.Event()
+        self._request_lock = threading.Lock()
+        self._listening = False
+        self._transcribing = False
+        self.last_transcript = ""
+        self.transcript_id = 0
+        self.audio_error = ""
+        self.camera_error = ""
+        self.input_device = cfg.get("audio.input_device")
+        from lablens.audio.stt import SpeechToText
+        self.stt = SpeechToText(cfg)
+        self._request_thread = None
+        self._closed = False
+        self._shutdown_lock = threading.Lock()
         self._last_det_update = 0.0
         self._last_answer = ""
         self._resistor_cache: dict = {}
@@ -133,58 +162,128 @@ class Runtime:
         self._thread.start()
 
     def stop(self) -> None:
+        with self._shutdown_lock:
+            if self._closed:
+                return
+            self._closed = True
         self._stop.set()
         if self._thread:
-            self._thread.join(timeout=2)
+            self._thread.join(timeout=5)
         self.async_det.close()
-        self.hands.close()
+        if self._thread is None or not self._thread.is_alive():
+            self.hands.close()
+        if self.speaker:
+            self.speaker.close()
 
     # ------------------------------------------------------------------ UI API (thread-safe)
     def snapshot(self) -> Snapshot:
         with self._lock:
-            return self._snap
+            return replace(self._snap, busy=self._busy.is_set(), listening=self._listening,
+                           transcribing=self._transcribing, camera_error=self.camera_error,
+                           last_transcript=self.last_transcript, audio_error=self.audio_error,
+                           transcript_id=self.transcript_id)
 
     def set_mouse(self, x: Optional[float], y: Optional[float] = None) -> None:
         """Mouse pointing: a virtual fingertip at (x, y). Pass None to release."""
         self._mouse = None if x is None else (float(x), float(y))
 
+    def select_component(self, track_id):
+        """Resolve the selected ID each frame, never a stale coordinate."""
+        self._manual_track = track_id
+
     def say(self, text: str, role: str = "lablens") -> None:
         self.messages.append((role, text))
-        if self.speaker:
-            self.speaker.say(text)
+        speaker = self.speaker
+        if speaker:
+            speaker.say(text)
+
+    def set_speech_enabled(self, enabled):
+        if enabled and self.speaker is None:
+            from lablens.audio.tts import Speaker
+            self.speaker = Speaker(self.cfg)
+        elif not enabled and self.speaker is not None:
+            speaker, self.speaker = self.speaker, None
+            speaker.close()
 
     def stop_talking(self) -> None:
-        if self.speaker:
-            self.speaker.stop()
+        speaker = self.speaker
+        if speaker:
+            speaker.stop()
 
     def ask(self, question: str, block: bool = False):
         """Ask about whatever is locked under the finger. Non-blocking by default."""
         question = question.strip()
-        if not question:
+        if not question or self._stop.is_set():
             return None
+        if not self._request_lock.acquire(blocking=False):
+            self.messages.append(("lablens", "Please wait for the current question to finish."))
+            return None
+        pointed = self._current_selection()
+        self._busy.set()
         self.messages.append(("you", question))
-        t = threading.Thread(target=self._answer, args=(question,), daemon=True, name="lablens-ask")
+        def run():
+            try:
+                self._answer(question, pointed)
+            finally:
+                self._busy.clear()
+                self._request_lock.release()
+        t = threading.Thread(target=run, daemon=True, name="lablens-ask")
+        self._request_thread = t
         t.start()
         if block:
             t.join()
         return t
 
-    def listen_and_ask(self) -> None:
+    def _start_voice(self, wav=None, ask=True):
+        if self._stop.is_set():
+            return None
+        if not self._request_lock.acquire(blocking=False):
+            return None
+        self._busy.set()
+        self.audio_error = ""
+        self.last_transcript = ""
+        pointed = self._current_selection()
+        self.stop_talking()  # prevent recording the assistant's own speech
         def run():
-            from lablens.audio.stt import SpeechToText
-
-            self.messages.append(("lablens", "🎤 listening…"))
+            from lablens.audio.stt import record, decode_audio
             try:
-                q = SpeechToText(self.cfg).listen()
+                if wav is None:
+                    self._listening = True
+                    audio = record(self.cfg.get("audio.record_seconds", 12),
+                                   self.cfg.get("audio.silence_seconds", 1.2),
+                                   self.cfg.get("audio.speech_threshold", 0.004), self.input_device)
+                else:
+                    audio = decode_audio(wav)
+                self._listening = False
+                self._transcribing = True
+                q = self.stt.transcribe(audio)
+                self.last_transcript = q
+                self.transcript_id += 1
+                self._transcribing = False
+                if q:
+                    if ask and not self._stop.is_set():
+                        self.messages.append(("you", q))
+                        self._answer(q, pointed)
+                else:
+                    self.audio_error = "No speech detected. Check the selected microphone, speak clearly, and try again."
             except Exception as e:
-                self.messages.append(("lablens", f"Microphone/STT error: {e}"))
-                return
-            if q:
-                self.ask(q)
-            else:
-                self.messages.append(("lablens", "I didn't catch that."))
+                self.audio_error = f"Microphone/STT error: {e}"
+                log.exception("Voice input failed")
+            finally:
+                self._listening = self._transcribing = False
+                self._busy.clear()
+                self._request_lock.release()
+        t = threading.Thread(target=run, daemon=True, name="lablens-listen")
+        self._request_thread = t
+        t.start()
+        return t
 
-        threading.Thread(target=run, daemon=True, name="lablens-listen").start()
+    def listen_and_ask(self):
+        return self._start_voice()
+
+    def transcribe_recording(self, wav: bytes):
+        """Browser recording -> editable transcript, without submitting it as a question."""
+        return self._start_voice(wav, ask=False)
 
     def start_project(self, project_id: str) -> str:
         from lablens.guided.engine import GuidedSession
@@ -214,6 +313,9 @@ class Runtime:
 
     # ------------------------------------------------------------------ internals
     def _current_selection(self) -> Optional[Detection]:
+        manual = getattr(self, "_manual_track", None)
+        if manual is not None:
+            return next((d for d in self._snap.detections if d.track_id == manual), None)
         sel = self._snap.selection
         return sel.detection if sel and sel.locked else None
 
@@ -221,10 +323,9 @@ class Runtime:
         r = self._resistor_cache.get(d.track_id)
         return r["ohms"] if r else None
 
-    def _answer(self, question: str) -> None:
+    def _answer(self, question: str, pointed=None) -> None:
         self._busy.set()
         try:
-            pointed = self._current_selection()
             extra = []
             if pointed is not None and pointed.label == "resistor":
                 r = self._resistor_cache.get(pointed.track_id)
@@ -234,8 +335,9 @@ class Runtime:
             stream = self.lens.ask_stream(question, pointed=pointed, guided_step=step, extra=extra,
                                           project=self.guided.project.id if self.guided else "",
                                           step=self.guided.idx + 1 if self.guided else -1)
-            if self.speaker:
-                self.speaker.say_stream(stream)
+            speaker = self.speaker
+            if speaker:
+                speaker.say_stream(stream)
             else:
                 for _ in stream:
                     pass
@@ -282,24 +384,38 @@ class Runtime:
         except Exception as e:
             log.error("camera: %s", e)
             self.messages.append(("lablens", f"Camera error: {e}"))
+            self.camera_error = str(e)
             return
         t_prev = time.perf_counter()
         fps = 0.0
+        failed_reads = 0
         try:
             while not self._stop.is_set():
                 frame = src.read()
                 if frame is None:
+                    failed_reads += 1
+                    if failed_reads >= 60:
+                        self.camera_error = "Camera stopped delivering frames. Reconnect it or choose another camera source."
                     time.sleep(0.02)
                     continue
+                failed_reads = 0
+                self.camera_error = ""
                 self.async_det.submit(frame)
                 dets = self.async_det.latest()
                 hands = self.hands.process(frame) if self.hands.available else []
-                hand: Optional[HandObservation] = hands[0] if hands else None
+                people_count = sum(d.label == "person" for d in dets)
+                hand: Optional[HandObservation] = hands[0] if len(hands) == 1 and people_count <= 1 else None
                 gesture = self.gesture_clf(hand) if hand is not None else "none"
-                if hand is None and self._mouse is not None:
+                if self._mouse is not None:
                     hand = virtual_hand(self._mouse)
+                if self._manual_track is not None:
+                    target = next((d for d in dets if d.track_id == self._manual_track), None)
+                    hand = virtual_hand(target.center) if target is not None else None
                 sel = self.pointer.update(hand, dets)
-                cmd = self.debounce.update(gesture)
+                humans = getattr(self.detector, "humans", None)
+                scene_mode = humans.scene_mode if humans is not None else "mixed"
+                allowed = self.gestures_enabled and gesture_controls_allowed(dets, scene_mode, self._busy.is_set())
+                cmd = self.debounce.update(gesture if allowed else "none")
                 if cmd == "next":
                     self.next_step() if self.guided else self.say("Thumbs up received.")
                 elif cmd == "repeat":
@@ -308,16 +424,17 @@ class Runtime:
                     self.stop_talking()
 
                 guided_state = None
-                if self.guided is not None:
-                    if self.async_det.updated_at != self._last_det_update:  # one vote per detector result
-                        self._last_det_update = self.async_det.updated_at
-                        self.guided.observe(dets)
-                        if self.guided.just_became_ok():
-                            self.say("Looks good. Give me a thumbs up for the next step.")
-                    st = self.guided.status
-                    guided_state = {"project": self.guided.project.title, "step": self.guided.idx + 1,
-                                    "total": len(self.guided.project.steps),
-                                    "instruction": self.guided.step["instruction"], "ok": st.ok,
+                guided = self.guided
+                if guided is not None:
+                    if self.async_det.sequence != self._last_det_update:  # one vote per detector result
+                        self._last_det_update = self.async_det.sequence
+                        guided.observe(dets)
+                        if guided.just_became_ok():
+                            self.say("Visual check passed. Select Next to continue.")
+                    st = guided.status
+                    guided_state = {"project": guided.project.title, "step": guided.idx + 1,
+                                    "total": len(guided.project.steps),
+                                    "instruction": guided.step["instruction"], "ok": st.ok,
                                     "messages": st.messages[:2]}
                 reading = self._maybe_read_resistor(frame, sel)
                 now = time.perf_counter()
@@ -329,9 +446,16 @@ class Runtime:
                     banner += f" | pointing: {sel.detection.label}{' (locked)' if sel.locked else ''}"
                 if reading:
                     banner += f" | bands ~ {reading}"
-                vis = draw(frame.copy(), dets, hand, sel, ray, banner)
+                vis = draw(frame.copy(), dets, hand, sel, ray)
+                humans = getattr(self.detector, "humans", None)
+                if humans is not None and self.show_body:
+                    from lablens.vision.humans import draw_pose
+                    draw_pose(vis, humans.last)
                 with self._lock:
                     self._snap = Snapshot(vis, dets, sel, gesture, self.hands.backend, self.async_det.fps, fps,
                                           guided_state, self._busy.is_set(), reading)
+        except Exception as e:
+            self.camera_error = f"Camera processing failed: {e}"
+            log.exception("Camera processing failed")
         finally:
             src.release()

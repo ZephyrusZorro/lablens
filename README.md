@@ -16,6 +16,11 @@ page citations instead of failing.
 
 ## Run it (Windows)
 
+**Human recognition and voice update:** The camera now recognizes people separately from electronics,
+with local face/pose models for visible body parts. The browser has a microphone recorder and an
+editable voice transcript. See [the updated operation notes](docs/HUMAN_VOICE_FIXES.md) for modes,
+verification evidence and remaining hardware limits.
+
 1. Double-click **`setup_windows.bat`** (one time, needs internet: about 10 minutes).
    It creates a virtual environment, installs everything (no PyTorch), downloads and verifies the
    open-source component detectors, the hand model and the offline speech model, builds the
@@ -180,3 +185,5 @@ eval/                      labelled grounding questions + pointing-trial templat
 docs/                      RUN_GUIDE.md (operate + demo), MANUAL_STEPS.md (what needs you)
 tests/                     unit, model and grounding-regression tests
 ```
+
+Latest local changes and verification: [Workbench revamp](docs/REVAMP_VALIDATION.md).

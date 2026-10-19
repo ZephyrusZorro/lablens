@@ -144,7 +144,10 @@ class YoloOnnx:
 
                 so = ort.SessionOptions()
                 so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-                so.intra_op_num_threads = threads or max(1, (os.cpu_count() or 2))
+                # Multiple detectors run alongside hands, audio and the UI. Giving
+                # each session every CPU core causes contention on Windows laptops.
+                so.intra_op_num_threads = threads or min(4, max(1, os.cpu_count() or 2))
+                so.add_session_config_entry("session.intra_op.allow_spinning", "0")
                 so.log_severity_level = 3
                 avail = ort.get_available_providers()
                 prov = [p for p in ("CUDAExecutionProvider", "DmlExecutionProvider", "CoreMLExecutionProvider")

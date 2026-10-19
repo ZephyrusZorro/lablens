@@ -8,3 +8,6 @@ samples/
 demo_out/
 runs/
 .pytest_cache/
+.pytest_tmp/
+*.log
+

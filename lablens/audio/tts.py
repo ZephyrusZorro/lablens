@@ -64,6 +64,7 @@ class Speaker:
         self._q: "queue.Queue[str | None]" = queue.Queue()
         self._stop = threading.Event()
         self._engine = None
+        self._closed = False
         self._proc: "subprocess.Popen | None" = None
         self.speaking = threading.Event()
         self._worker = threading.Thread(target=self._run, daemon=True)
@@ -71,6 +72,8 @@ class Speaker:
 
     # public -------------------------------------------------------------
     def say(self, text: str) -> None:
+        if self._closed:
+            return
         self._stop.clear()
         self._q.put(clean_for_speech(text))
 
@@ -80,7 +83,7 @@ class Speaker:
         full = []
         for sent in split_sentences(tokens):
             full.append(sent)
-            if not self._stop.is_set():
+            if not self._stop.is_set() and not self._closed:
                 self._q.put(clean_for_speech(sent))
         return " ".join(full)
 
@@ -104,6 +107,14 @@ class Speaker:
             sd.stop()
         except Exception:
             pass
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self.stop()
+        self._q.put(None)
+        self._worker.join(timeout=3)
 
     # worker --------------------------------------------------------------
     def _run(self) -> None:

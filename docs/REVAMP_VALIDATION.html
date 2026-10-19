@@ -1,0 +1,44 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Workbench revamp — 19 October 2026</title><style>
+:root { color-scheme: light dark; --fg:#1d232b; --bg:#fbfbfa; --muted:#5b6672; --line:#d9dde2; --accent:#0b6e4f;
+        --code:#f0f2f4; }
+@media (prefers-color-scheme: dark) { :root { --fg:#e6e9ec; --bg:#16191d; --muted:#9aa4ae; --line:#2e343b;
+        --accent:#5cc79d; --code:#22272d; } }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+h1 { font-size: 2rem; margin: .2em 0 .6em; } h2 { margin-top: 2.2em; border-bottom: 1px solid var(--line);
+     padding-bottom: .3em; } h3 { margin-top: 1.6em; }
+a { color: var(--accent); } hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0; }
+code { background: var(--code); padding: .1em .35em; border-radius: 4px; font-size: .92em; }
+pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--code); } blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--accent);
+     color: var(--muted); }
+</style></head><body><main><h1>Workbench revamp — 19 October 2026</h1>
+<p>Saved locally; no commit or push performed. This replaces the earlier Premium UI layout.</p>
+<h2>Workflow</h2>
+<p>The camera source and recognition mode are visible above the workspace. Inspect is for selecting a component and asking questions; Build contains project steps; Manual shows the cited source. Settings holds speech, skeleton overlays and optional gesture shortcuts. The interface uses warm neutral colours, a restrained rust accent, small corner radii and direct labels. Removed the marketing heading, metric cards, repeated panels and dense body-part box overlays.</p>
+<p>Refresh detected components to populate a stable selection list. A selected ID follows that part rather than a stale screen coordinate. Selecting a part applies to a question immediately; no pointing dwell is needed. If it disappears, questions do not silently switch to a nearby part. Switching camera sources starts a new workspace and clears its audio draft and component selection.</p>
+<h2>Recognition and stability</h2>
+<ul>
+<li>Separate trackers for stationary electronics and moving people. People expire after one missed update; independent anatomy tracks no longer linger or jump between people.</li>
+<li>Pose estimation uses a crop for each detected person, up to six. Optional skeleton overlays avoid dense overlapping anatomy labels and unnecessary pose work during normal inspection.</li>
+<li>Multiple people or ambiguous hands disable automatic pointing. Gesture commands are opt-in and cannot advance a build in a crowd. Manual selection remains available.</li>
+<li>Failed recognition clears old boxes and exposes an error; results older than two seconds expire. Missing component models now produce an actionable error instead of silently displaying mock detections.</li>
+<li>Guided checks use a sequence counter rather than coarse Windows timestamps.</li>
+<li>Camera frames are JPEG data URLs, avoiding rapidly expired media URLs. Selection controls do not redraw on a timer. Only the live view and live status panels refresh.</li>
+</ul>
+<h2>Verification</h2>
+<ul>
+<li>78 pytest tests passed in 2.79 seconds. Python compilation, dependency consistency and git whitespace checks passed locally.</li>
+<li>Live browser camera showed two and three people with zero electronics in the room view. This is an observation, not an accuracy benchmark.</li>
+<li>Synthetic three-person replay: three stable person tracks after the two-update confirmation, and three pose skeletons using per-person crops. The earlier full-frame pose pass found zero in the same replay.</li>
+<li>Synthetic cropped bench replay returned independent transistor, LED and breadboard tracks. This does not establish detection recall on the user's kit. The uncropped duplicated sample also includes a person behind the board and triggers Auto's conservative suppression; Mixed mode is intended for loose components.</li>
+<li>Browser: live-to-photo source switch; LED selection; question about positive leg answered correctly by local Ollama in 7.3 seconds; build start, visual board check, advance to step 2, end; Manual navigation.</li>
+<li>Doctor: camera 0 readable at 640x480; models, retrieval, local speech recognition and Ollama available. Physical Realtek microphone now enumerates. Six-second local recording returned no detected speech, so live word accuracy remains unverified.</li>
+<li>Groq still returns HTTP 404. Local Ollama is the working answer provider.</li>
+</ul>
+<p>Evidence is saved in data/scene_validation.json, data/doctor_revamp.txt and data/microphone_revamp.json. These local diagnostics are gitignored.</p>
+<h2>Remaining limits</h2>
+<p>No test suite can establish that the whole application is bug-free. Crossing/occluded people can change IDs: these are temporary tracks, not identity recognition. Body landmarks and component detections can be missed; train/evaluate on the actual bench before claiming accuracy. Automatic mode intentionally suppresses parts overlapping people or background furniture. Build checks do not verify electrical connectivity. A spoken microphone test with a known sentence is still needed.</p></main></body></html>

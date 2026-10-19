@@ -26,7 +26,10 @@ def draw(frame: np.ndarray, dets: Iterable[Detection], hand: Optional[HandObserv
          sel: Optional[Selection] = None, ray: Optional[tuple] = None, banner: str = "") -> np.ndarray:
     out = frame
     sel_key = (sel.detection.label, sel.detection.track_id) if sel else None
+    from lablens.vision.humans import HUMAN_CLASSES
     for d in dets:
+        if d.label in HUMAN_CLASSES - {"person"}:
+            continue
         color = PALETTE.get(d.label, (200, 200, 200))
         is_sel = sel_key == (d.label, d.track_id)
         thick = 4 if is_sel else (1 if d.label == "breadboard" else 2)
@@ -34,12 +37,16 @@ def draw(frame: np.ndarray, dets: Iterable[Detection], hand: Optional[HandObserv
             color = (0, 255, 0) if sel.locked else (0, 255, 255)
         p1, p2 = (int(d.x1), int(d.y1)), (int(d.x2), int(d.y2))
         cv2.rectangle(out, p1, p2, color, thick)
-        _label(out, f"{d.label} {d.conf:.2f}" + (" [LOCKED]" if is_sel and sel.locked else ""), p1[0], p1[1], color)
+        name = f"Person {d.track_id - 1_000_000}" if d.label == "person" and d.track_id >= 1_000_000 else d.label
+        _label(out, f"{name}" + (" [LOCKED]" if is_sel and sel.locked else ""), p1[0], p1[1], color)
     if hand is not None:
         pts = [(int(x), int(y)) for x, y in hand.landmarks]
         if hand.handedness != "Virtual":
             for a, b in HAND_CONNECTIONS:
                 cv2.line(out, pts[a], pts[b], (230, 230, 230), 1, cv2.LINE_AA)
+            _label(out, f"{hand.handedness.lower()} hand", pts[0][0], pts[0][1], (230, 210, 70), 0.45)
+            for i, name in ((4, "thumb"), (8, "index"), (12, "middle"), (16, "ring"), (20, "little")):
+                cv2.putText(out, name, pts[i], cv2.FONT_HERSHEY_SIMPLEX, 0.35, (230, 210, 70), 1, cv2.LINE_AA)
         if ray is not None:
             (x0, y0), (x1, y1) = ray
             cv2.arrowedLine(out, (int(x0), int(y0)), (int(x1), int(y1)), (0, 255, 0), 2, cv2.LINE_AA, tipLength=0.15)

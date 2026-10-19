@@ -19,6 +19,27 @@ th { background: var(--code); } blockquote { margin: 1em 0; padding: .2em 1em; b
 <p>How to install, run, operate and demo LabLens. The jobs only you can do are in
 <a href="MANUAL_STEPS.html">MANUAL_STEPS.md</a>.</p>
 <hr />
+<h2>Human recognition and revised voice controls (19 October 2026)</h2>
+<p>The refreshed browser workspace opens with settings collapsed. Use the <strong>double-arrow sidebar
+button</strong> at the top-left for camera source, recognition mode, answer engine and speech output.
+The main workspace contains the live camera, <strong>Focus component</strong>, <strong>Lab assistant</strong>, <strong>Voice studio</strong>,
+<strong>Guided build</strong>, and <strong>Sourcebook</strong>. The four status cards use live runtime data; the cited page is
+available under <strong>Read cited page</strong> after an answer.</p>
+<p>In the browser, choose <strong>Live camera</strong> and <strong>Auto: bench and people</strong>. Human boxes and visible body
+landmarks are independent of the component detector. <strong>People and body parts</strong> hides electronics
+labels entirely. <strong>Mixed: loose components</strong> permits loose electronics outside a breadboard;
+use it for a close-up bench view. Hidden limbs are not presented as visible detections.</p>
+<p>For voice input in the browser, use <strong>Record your question</strong>, stop recording, review/edit
+<strong>Recognized text</strong>, then click <strong>Ask this question</strong>. Keep recordings under 60 seconds.
+<strong>Speak answers</strong> starts off in the browser to reduce microphone feedback; turn it on when needed.
+Recognition runs with cached local Whisper, so the unavailable Groq endpoint does not block it.
+Select the physical microphone in your browser if the recording is silent. The desktop SPACE key
+still records through a Windows input; select a microphone explicitly with
+<code>run_lablens.bat --input-device 2</code> (replace 2 with its actual device index).</p>
+<p>The Windows default input on the tested machine was a virtual cable. The updated doctor warns
+about that; an open virtual input is not proof of working microphone capture. See
+<a href="HUMAN_VOICE_FIXES.html">HUMAN_VOICE_FIXES.md</a> for validation and limits.</p>
+<hr />
 <h2>1. What you need</h2>
 <table>
 <thead>
