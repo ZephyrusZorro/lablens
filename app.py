@@ -1,4 +1,4 @@
-"""LabLens workspace: local vision, reviewed voice input, and cited answers."""
+"""LabLens workspace: local vision, reviewed voice input, circuit synthesizer, and cited answers."""
 from __future__ import annotations
 
 import argparse
@@ -17,6 +17,53 @@ st.set_page_config(page_title="LabLens | Workbench", page_icon=":material/center
                    layout="wide", initial_sidebar_state="collapsed")
 
 cfg = get_config()
+
+# Premium UI styling
+st.markdown("""
+<style>
+/* Refined card, button, and expander styling */
+div[data-testid="stExpander"] {
+    border: 1px solid #D5D7D1 !important;
+    border-radius: 8px !important;
+    background-color: #FFFFFF !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03) !important;
+    margin-bottom: 0.6rem !important;
+}
+div[data-testid="stChatMessage"] {
+    border-radius: 8px !important;
+    padding: 0.75rem 1rem !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+}
+div[data-testid="stImage"] img {
+    border-radius: 8px !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+}
+.lablens-header-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: #E8F3EE;
+    border: 1px solid #B4D7C6;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #16372D;
+    letter-spacing: 0.02em;
+}
+.lablens-pill-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background: #ECEBE5;
+    color: #3B4243;
+    margin-right: 4px;
+    margin-bottom: 4px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 def cli_args():
@@ -77,16 +124,25 @@ with st.sidebar:
         st.caption("Automatic gestures activate in a bench context. Desktop: SPACE to speak, ENTER to type.")
 
 
-with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
-    st.title("LabLens")
-    st.caption("ELECTRONICS WORKBENCH")
+# Top header bar
+wordmark = ROOT / "assets" / "lablens-wordmark.svg"
+if wordmark.exists():
+    with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
+        st.image(str(wordmark), width=190)
+        st.markdown('<div class="lablens-header-status">● System Ready · Multimodal AI Bench</div>', unsafe_allow_html=True)
+else:
+    with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
+        st.title("LabLens")
+        st.caption("ELECTRONICS WORKBENCH & MENTOR")
+
 with st.container(horizontal=True, vertical_alignment="bottom"):
     view = st.selectbox("Camera source", ["Live camera", "Sample photo"],
                         index=1 if args.source is not None else 0, key="camera_source")
     mode = st.selectbox("Recognition mode", list(MODES), key="recognition_mode",
                         help="Auto keeps electronics on a detected board when people are visible. Mixed allows loose parts.")
 
-section = st.segmented_control("Workspace", ["Inspect", "Build", "Manual"], default="Inspect", key="workspace_section", label_visibility="collapsed")
+section = st.segmented_control("Workspace", ["Inspect", "Build", "Circuit Synthesizer", "Manual"],
+                               default="Inspect", key="workspace_section", label_visibility="collapsed")
 
 source = (args.source or "samples/bench_demo.png") if view == "Sample photo" else int(camera_index)
 if st.session_state.get("runtime_key") != source:
@@ -278,6 +334,134 @@ def build_panel():
     st.caption("Checks parts and approximate placement. Electrical wiring needs your own verification.")
 
 
+def synthesizer_panel():
+    from lablens.core.synthesizer import CircuitSynthesizer
+
+    st.subheader("Circuit & Project Synthesizer", icon=":material/auto_awesome:")
+    st.caption("Input what components and materials you have on hand, or scan them directly from the bench camera. "
+               "LabLens synthesizes working circuits, calculations, schematics, and camera-verified builds.")
+
+    synth = CircuitSynthesizer()
+
+    if "student_materials" not in st.session_state:
+        st.session_state.student_materials = ["Breadboard", "Red LED", "330Ω Resistor", "9V Battery / DC Supply"]
+    if "synthesized_results" not in st.session_state:
+        st.session_state.synthesized_results = None
+
+    with st.container(border=True):
+        st.markdown("**1. What parts do you have on your bench?**")
+        col1, col2 = st.columns([1, 1], gap="medium")
+        with col1:
+            if st.button("Scan bench parts from camera", icon=":material/center_focus_strong:",
+                         use_container_width=True, help="Detects components on the camera and adds them to your inventory."):
+                snap = rt.snapshot()
+                scanned = [d.label.capitalize() for d in snap.detections
+                           if d.label not in HUMAN_CLASSES]
+                if scanned:
+                    existing = set(st.session_state.student_materials)
+                    for item in scanned:
+                        if item not in existing:
+                            st.session_state.student_materials.append(item)
+                    st.toast(f"Detected {len(scanned)} parts from bench camera!", icon="🔍")
+                else:
+                    st.info("No components detected on camera yet. Point the camera at your breadboard or parts.")
+
+        with col2:
+            if st.button("Reset parts list", icon=":material/restart_alt:", use_container_width=True):
+                st.session_state.student_materials = []
+                st.session_state.synthesized_results = None
+
+        common_palette = [
+            "Breadboard", "Red LED", "Green LED", "330Ω Resistor", "1kΩ Resistor",
+            "10kΩ Resistor", "100kΩ Resistor", "NE555 Timer IC", "10µF Capacitor",
+            "100µF Capacitor", "BC547 NPN Transistor", "1N4007 Diode", "Zener Diode",
+            "9V Battery / DC Supply", "LDR (Photoresistor)", "Pushbutton"
+        ]
+
+        selected_materials = st.multiselect(
+            "Select available components:",
+            options=common_palette,
+            default=[item for item in st.session_state.student_materials if item in common_palette],
+            key="materials_multiselect"
+        )
+
+        custom_input = st.text_input("Add other specialized parts (comma-separated):",
+                                     placeholder="e.g. buzzer, LM358, 47k potentiometer, ceramic capacitor",
+                                     key="custom_materials_input")
+
+        all_materials = list(selected_materials)
+        if custom_input:
+            all_materials.extend([p.strip() for p in custom_input.split(",") if p.strip()])
+        st.session_state.student_materials = all_materials
+
+        if all_materials:
+            st.caption("Active inventory: " + " · ".join(f"`{m}`" for m in all_materials))
+        else:
+            st.warning("Please select or add at least one component to synthesize projects.")
+
+        c_act1, c_act2 = st.columns([1.5, 1])
+        with c_act1:
+            do_synthesize = st.button("Synthesize Circuits & Projects", icon=":material/biotech:",
+                                      type="primary", use_container_width=True,
+                                      disabled=not all_materials)
+        with c_act2:
+            use_ai_synth = st.checkbox("AI Custom Synthesis", value=False,
+                                       help="Uses local/cloud LLM to creatively design custom circuits from your exact kit.")
+
+        if do_synthesize and all_materials:
+            with st.spinner("Synthesizing viable circuits from your bench components..."):
+                if use_ai_synth:
+                    custom_proj = synth.synthesize_with_llm(all_materials, rt.lens.router, rt.lens.store)
+                    standard = synth.match_projects(all_materials)
+                    st.session_state.synthesized_results = [custom_proj] + standard
+                else:
+                    st.session_state.synthesized_results = synth.match_projects(all_materials)
+
+    results = st.session_state.synthesized_results
+    if results:
+        st.markdown(f"**Synthesized {len(results)} viable projects from your components:**")
+        for idx, p in enumerate(results):
+            with st.expander(f"{p.title}  ·  [{p.difficulty}]", expanded=(idx == 0)):
+                if not p.missing_materials:
+                    st.badge("100% Complete — All Materials Available", color="green", icon=":material/check_circle:")
+                else:
+                    st.badge("Partially Matched", color="orange", icon=":material/info:")
+                    st.caption("Missing parts: " + ", ".join(p.missing_materials))
+
+                st.markdown(f"**Overview:** {p.summary}")
+                st.markdown(f"**Circuit Theory:** {p.working_principle}")
+
+                if p.formula:
+                    st.markdown("**Key Calculation:**")
+                    st.latex(p.formula)
+
+                st.markdown("**Step-by-Step Breadboard Wiring Guide:**")
+                for s_idx, s in enumerate(p.breadboard_steps, start=1):
+                    st.markdown(f"**{s_idx}.** {s}")
+
+                if p.safety_tips:
+                    st.warning("**Safety & Verification:**\n" + "\n".join(f"- {tip}" for tip in p.safety_tips))
+
+                if p.citations:
+                    st.caption("Lab Manual Citations: " + " · ".join(p.citations))
+
+                b_col1, b_col2 = st.columns([1, 1], gap="small")
+                with b_col1:
+                    if st.button("Launch in Camera Guided Build", icon=":material/play_circle:",
+                                 key=f"launch_{p.id}_{idx}", use_container_width=True, type="primary"):
+                        guided_proj = p.to_guided_project()
+                        rt.register_project(guided_proj)
+                        rt.start_project(guided_proj.id)
+                        st.session_state.workspace_section = "Build"
+                        st.rerun()
+                with b_col2:
+                    if st.button("Ask Assistant About This", icon=":material/chat:",
+                                 key=f"ask_assistant_{p.id}_{idx}", use_container_width=True):
+                        rt.ask(f"How do I wire and test the {p.title}?")
+                        st.toast(f"Consulted LabLens on {p.title}", icon="💡")
+                        st.rerun()
+
+
 with left:
     if section in ("Inspect", "Build"):
         video_panel()
@@ -285,6 +469,8 @@ with left:
             focus_panel()
         else:
             build_panel()
+    elif section == "Circuit Synthesizer":
+        synthesizer_panel()
     else:
         source_panel()
         st.divider()

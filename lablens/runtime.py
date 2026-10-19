@@ -285,6 +285,9 @@ class Runtime:
         """Browser recording -> editable transcript, without submitting it as a question."""
         return self._start_voice(wav, ask=False)
 
+    def register_project(self, project) -> None:
+        self.projects[project.id] = project
+
     def start_project(self, project_id: str) -> str:
         from lablens.guided.engine import GuidedSession
 
@@ -293,6 +296,7 @@ class Runtime:
         msg = f"Starting {self.guided.project.title}. {self.guided.step_label}"
         self.say(msg)
         return msg
+
 
     def stop_project(self) -> None:
         self.guided = None
