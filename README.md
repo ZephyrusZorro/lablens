@@ -143,7 +143,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-58 tests cover pointing geometry, gestures, query fusion and follow-ups, retrieval (incl. a grounding
+Tests cover pointing geometry, gestures, query fusion and follow-ups, retrieval (incl. a grounding
 regression on eval/grounding.csv) and the
 extractive fallback, TTS sentence streaming, Guided Build verification, the ONNX writer and exporter,
 NMS / letterbox / anchors, Weighted Box Fusion, the breadboard detector, and the resistor reader

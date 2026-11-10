@@ -1,5 +1,6 @@
 """Regressions for person/electronics confusion and the complete voice input contract."""
 import io
+import sys
 import threading
 from collections import deque
 from types import SimpleNamespace
@@ -85,10 +86,12 @@ def test_silence_never_generates_a_whisper_question(monkeypatch):
 
 
 def test_virtual_default_requires_explicit_selection(monkeypatch):
-    import sounddevice as sd
     devices = [{"name": "CABLE Output", "max_input_channels": 2}]
-    monkeypatch.setattr(sd, "default", SimpleNamespace(device=[0, 1]))
-    monkeypatch.setattr(sd, "query_devices", lambda index=None, kind=None: devices if index is None else devices[index])
+    audio_backend = SimpleNamespace(
+        default=SimpleNamespace(device=[0, 1]),
+        query_devices=lambda index=None, kind=None: devices if index is None else devices[index],
+    )
+    monkeypatch.setitem(sys.modules, "sounddevice", audio_backend)
     with pytest.raises(RuntimeError, match="physical microphone"):
         resolve_input_device()
     assert resolve_input_device(0) == 0
